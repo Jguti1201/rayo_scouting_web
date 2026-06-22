@@ -1,0 +1,37 @@
+# Entorno / secretos
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Streamlit / logs
+.streamlit/secrets.toml
+*.log
+
+# Datos pesados / outputs
+data/
+dataset_final/
+sofascore_data/
+*.csv
+*.xlsx
+*.parquet
+*.feather
+*.pkl
+*.joblib
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

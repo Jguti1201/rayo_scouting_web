@@ -49,6 +49,8 @@ from tabs.tab_scout_ia import render_scout_ia_tab
 from features.data_loader import load_data
 from rayo_scouting.features.adaptation_score import compute_adaptation_score
 from rayo_scouting.scouting.report_generation import render_watchlist_reports
+# AÑADIR junto al resto de imports de features
+from features.clustering import warmup_all_clusters
 
 logging.basicConfig(level=logging.WARNING)
 
@@ -336,6 +338,12 @@ if "messages" not in st.session_state:
 
 df = get_data(debug_csv=True)
 
+# Precalentar los 4 clusters en una sola pasada antes del primer render.
+# Sin esto, cada tab que llame a get_or_build_clusters escribe en
+# st.session_state y dispara un rerun, creando un loop donde
+# Centrocampista y Portero nunca llegan a construirse.
+warmup_all_clusters(df)
+
 # ── Helpers ──────────────────────────────────────────────────────────────────
 def fmt_liga(liga: str) -> str:
     return LIGA_DISPLAY.get(str(liga), str(liga))
@@ -467,6 +475,7 @@ st.markdown(f"""
     </div>
 </div>
 """, unsafe_allow_html=True)
+
 
 # ── Tabs ─────────────────────────────────────────────────────────────────────
 tab1, tab2, tab3, tab4, tab5 = st.tabs([

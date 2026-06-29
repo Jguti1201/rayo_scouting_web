@@ -1,95 +1,109 @@
 """
-gemini_tab_comparador_perfiles.py
-==================================
-Comparador de perfiles v3 con:
-- Clustering integrado (muestra perfil/cluster de cada jugador)
-- Radar con percentiles POSICIONALES (no globales)
-- Búsqueda de similares al jugador seleccionado
-- Presentación ejecutiva mejorada
+tab_comparador_perfiles.py
+==========================
+Comparador de perfiles v4 con:
+- Selección de fuente: Plantilla Rayo / Cartera / Base completa
+- Fichas con clustering y perfil táctico
+- Radar General (5 ejes: Shooting / Passing / Dribbling / Defending / Physical)
+  → percentiles GLOBALES respecto a todo el dataset
+- Radares detallados por categoría seleccionable con todas las métricas
+  → percentiles GLOBALES respecto a todo el dataset
+- Lectura ejecutiva, tabla comparativa, jugadores similares
 """
 
 from __future__ import annotations
 
 import logging
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
-
+from rayo_scouting.features.feature_engineering import validate_position
 from rayo_scouting.scouting.dashboard_metrics import fmt_liga, get_rayo_df, get_watchlist_df
 from rayo_scouting.features.clustering import (
-    compute_positional_percentile,
     find_similar_players,
     get_cluster_for_player,
     POSITION_CLUSTER_DESCRIPTIONS,
-    CLUSTER_COLORS,
 )
 
 logger = logging.getLogger(__name__)
 
-
 # ============================================================================
-# CONFIG
+# CONSTANTES
 # ============================================================================
-
-COMPARISON_METRICS = [
-    ("Goals", "Goles"),
-    ("Assists", "Asistencias"),
-    ("Expected goals (xG)", "xG"),
-    ("Key passes", "Pases clave"),
-    ("Succ. dribbles", "Regates"),
-    ("Tackles_p90", "Tackles p90"),
-    ("Interceptions_p90", "Intercepciones p90"),
-    ("Clearances_p90", "Despejes p90"),
-    ("Accurate passes %", "Precisión pase (%)"),
-    ("ground_duels_won_pct", "Duelos suelo (%)"),
-    ("aerial_duels_won_pct", "Duelos aéreos (%)"),
-    ("Average Sofascore Rating", "Rating"),
-    ("minutes_played", "Minutos"),
-]
 
 SOURCE_OPTIONS = ["Plantilla Rayo", "Cartera", "Base completa"]
 
-POSITION_RADAR_MAP = {
-    "portero": [
-        ("Total_saves_p90", "Paradas p90"),
-        ("Saves_from_inside_box_p90", "Paradas área"),
-        ("Clean sheets", "Port. a 0"),
-        ("Runs out", "Salidas"),
-        ("Accurate passes %", "Prec. pase"),
-        ("Average Sofascore Rating", "Rating"),
+COLOR_A  = "#E30613"
+COLOR_B  = "#1A1A2E"
+FILL_A   = "rgba(227, 6, 19, 0.18)"
+FILL_B   = "rgba(26, 26, 46, 0.18)"
+
+# Métricas para la tabla comparativa (sin cambios respecto a v3)
+COMPARISON_METRICS = [
+    ("Goals",                    "Goles"),
+    ("Assists",                  "Asistencias"),
+    ("Expected goals (xG)",      "xG"),
+    ("Key passes",               "Pases clave"),
+    ("Succ. dribbles",           "Regates"),
+    ("Tackles_p90",              "Tackles p90"),
+    ("Interceptions_p90",        "Intercepciones p90"),
+    ("Clearances_p90",           "Despejes p90"),
+    ("Accurate passes %",        "Precisión pase (%)"),
+    ("ground_duels_won_pct",     "Duelos suelo (%)"),
+    ("aerial_duels_won_pct",     "Duelos aéreos (%)"),
+    ("Average Sofascore Rating", "Rating"),
+    ("minutes_played",           "Minutos"),
+]
+
+# ── Definición de categorías para los radares ─────────────────────────────
+# Formato: (columna_df, etiqueta, invertir)
+# invertir=True  → métrica negativa; se gira el percentil para que
+#                  "hacia fuera" siempre signifique "mejor"
+KPI_CATEGORIES: dict[str, list[tuple[str, str, bool]]] = {
+    "Shooting": [
+        ("Goals",               "Goles",               False),
+        ("Expected goals (xG)", "xG",                  False),
+        ("Total shots",         "Disparos tot.",        False),
+        ("Goal conversion %",   "Conversión %",         False),
+        ("Big chances missed",  "Gr. oc. falladas",     True),
+        ("Blocked shots",       "Disparos bloq.",       False),
     ],
-    "defensa": [
-        ("Tackles_p90", "Tackles"),
-        ("Interceptions_p90", "Intercep."),
-        ("Clearances_p90", "Despejes"),
-        ("aerial_duels_won_pct", "Aéreos %"),
-        ("ground_duels_won_pct", "Suelo %"),
-        ("Accurate passes %", "Prec. pase"),
+    "Passing": [
+        ("Assists",             "Asistencias",          False),
+        ("Accurate passes",     "Pases precisos",       False),
+        ("Accurate passes %",   "Precisión pase %",     False),
+        ("Key passes",          "Pases clave",          False),
+        ("Big chances created", "Gr. oc. creadas",      False),
     ],
-    "medio": [
-        ("Key_passes_p90", "P. clave"),
-        ("Big_chances_created_p90", "Ocasiones"),
-        ("Accurate passes %", "Prec. pase"),
-        ("Tackles_p90", "Tackles"),
-        ("Interceptions_p90", "Intercep."),
-        ("Goals_p90", "Goles p90"),
+    "Dribbling": [
+        ("Succ. dribbles",      "Regates exitosos",     False),
+        ("ground_duels_won_pct","Duelos terrestres %",  False),
+        ("total_duels_won_pct", "Duelos totales %",     False),
     ],
-    "delantero": [
-        ("Goals_p90", "Goles p90"),
-        ("xG_p90", "xG p90"),
-        ("Total_shots_p90", "Tiros p90"),
-        ("Succ_dribbles_p90", "Regates p90"),
-        ("Key_passes_p90", "P. clave"),
-        ("Goal conversion %", "Conv. gol"),
+    "Defending": [
+        ("Tackles",             "Entradas",             False),
+        ("Interceptions",       "Intercepciones",       False),
+        ("Clearances",          "Despejes",             False),
+        ("aerial_duels_won_pct","Duelos aéreos %",      False),
+        ("Errors leading to goal", "Errores -> Gol",    True),
+        ("fouls",               "Faltas cometidas",     True),
     ],
-    "general": [
-        ("Average Sofascore Rating", "Rating"),
-        ("Accurate passes %", "Prec. pase"),
-        ("ground_duels_won_pct", "Duelos suelo"),
-        ("Goals_p90", "Goles p90"),
-        ("Key_passes_p90", "P. clave"),
-        ("Interceptions_p90", "Intercep."),
+    "Physical": [
+        ("minutes_played",      "Minutos jugados",      False),
+        ("total_duels_won_pct", "Duelos ganados %",     False),
+        ("aerial_duels_won_pct","Duelos aéreos %",      False),
+        ("ground_duels_won_pct","Duelos terr. %",       False),
+        ("fouls",               "Faltas",               True),
     ],
+}
+
+CAT_ICONS = {
+    "Shooting":  "Shooting",
+    "Passing":   "Passing",
+    "Dribbling": "Dribbling",
+    "Defending": "Defending",
+    "Physical":  "Physical",
 }
 
 
@@ -97,7 +111,7 @@ POSITION_RADAR_MAP = {
 # HELPERS
 # ============================================================================
 
-def _safe_float(v):
+def _safe_float(v) -> float:
     if pd.isna(v):
         return 0.0
     try:
@@ -106,17 +120,15 @@ def _safe_float(v):
         return 0.0
 
 
-def _normalize_position(pos: str) -> str:
-    pos = str(pos).strip().lower()
-    if "portero" in pos:
-        return "portero"
-    if any(x in pos for x in ["central", "defensa", "lateral", "carrilero"]):
-        return "defensa"
-    if any(x in pos for x in ["mediocentro", "medio", "interior", "pivote", "mediapunta"]):
-        return "medio"
-    if any(x in pos for x in ["delantero", "extremo", "segundo punta"]):
-        return "delantero"
-    return "general"
+def _global_percentile(df: pd.DataFrame, col: str, value: float, invert: bool) -> float:
+    """Percentil global del value en df[col]. Si invert, se invierte (100 - pct)."""
+    if col not in df.columns:
+        return 0.0
+    series = pd.to_numeric(df[col], errors="coerce").dropna()
+    if series.empty or series.std() == 0:
+        return 50.0
+    pct = float((series <= value).mean() * 100)
+    return round(100.0 - pct if invert else pct, 1)
 
 
 def _get_source_df(df: pd.DataFrame, source: str) -> pd.DataFrame:
@@ -149,83 +161,18 @@ def _get_player_row(df: pd.DataFrame, name: str) -> pd.Series | None:
 
 
 # ============================================================================
-# RADAR
-# ============================================================================
-
-def _get_radar_categories(player_a: pd.Series, player_b: pd.Series, df: pd.DataFrame):
-    pos_a = _normalize_position(player_a.get("posicion", ""))
-    pos_b = _normalize_position(player_b.get("posicion", ""))
-
-    if pos_a == pos_b:
-        selected = POSITION_RADAR_MAP.get(pos_a, POSITION_RADAR_MAP["general"])
-        radar_type = f"Radar específico: {pos_a.capitalize()}"
-        position_filter = player_a.get("posicion", "")
-    else:
-        selected = POSITION_RADAR_MAP["general"]
-        radar_type = "Radar general (demarcaciones distintas)"
-        position_filter = None
-
-    selected = [(col, lbl) for col, lbl in selected if col in df.columns]
-    return selected, radar_type, position_filter
-
-
-def _build_radar(player_a: pd.Series, player_b: pd.Series, df: pd.DataFrame):
-    categories, radar_type, pos_filter = _get_radar_categories(player_a, player_b, df)
-
-    labels, vals_a, vals_b = [], [], []
-
-    for col, lbl in categories:
-        raw_a = _safe_float(player_a.get(col, 0))
-        raw_b = _safe_float(player_b.get(col, 0))
-
-        if pos_filter:
-            pct_a = compute_positional_percentile(df, pos_filter, col, raw_a)
-            pct_b = compute_positional_percentile(df, pos_filter, col, raw_b)
-        else:
-            series = pd.to_numeric(df[col], errors="coerce").dropna() if col in df.columns else pd.Series()
-            pct_a = round(float((series <= raw_a).mean() * 100), 1) if not series.empty else 0
-            pct_b = round(float((series <= raw_b).mean() * 100), 1) if not series.empty else 0
-
-        labels.append(lbl)
-        vals_a.append(pct_a)
-        vals_b.append(pct_b)
-
-    fig = go.Figure()
-
-    fig.add_trace(go.Scatterpolar(
-        r=vals_a, theta=labels, fill='toself',
-        name=str(player_a.get("Name", "Jugador 1")),
-        line_color='#E30613', fillcolor='rgba(227, 6, 19, 0.20)'
-    ))
-    fig.add_trace(go.Scatterpolar(
-        r=vals_b, theta=labels, fill='toself',
-        name=str(player_b.get("Name", "Jugador 2")),
-        line_color='#1A1A2E', fillcolor='rgba(26, 26, 46, 0.20)'
-    ))
-
-    fig.update_layout(
-        title=radar_type,
-        polar=dict(radialaxis=dict(visible=True, range=[0, 100],
-                                    tickvals=[20, 40, 60, 80, 100])),
-        showlegend=True, height=540,
-        margin=dict(t=80, b=40, l=40, r=40)
-    )
-    return fig
-
-
-# ============================================================================
 # FICHA DE JUGADOR
 # ============================================================================
 
-def _render_player_card(row: pd.Series, title: str, df: pd.DataFrame):
-    position = str(row.get("posicion", ""))
-    cluster = get_cluster_for_player(df, str(row.get("Name", "")), position)
+def _render_player_card(row: pd.Series, title: str, color: str, df: pd.DataFrame):
+    position = validate_position(row.get("posicion"))
+    cluster = get_cluster_for_player(df, str(row.get("Name", "")), position) if position else None
     cluster_desc = ""
-    if cluster:
+    if cluster and position:
         cluster_desc = POSITION_CLUSTER_DESCRIPTIONS.get(position, {}).get(cluster, "")
 
     st.markdown(f"""
-    <div style="background:white;border:1px solid #dee2e6;border-top:4px solid #212529;
+    <div style="background:white;border:1px solid #dee2e6;border-top:4px solid {color};
                 border-radius:8px;padding:16px;margin-bottom:14px;">
         <div style="font-size:0.7rem;color:#6c757d;font-weight:700;text-transform:uppercase;">{title}</div>
         <div style="font-size:1.25rem;font-weight:700;color:#212529;margin-top:6px;">{row.get('Name','?')}</div>
@@ -246,9 +193,7 @@ def _render_player_card(row: pd.Series, title: str, df: pd.DataFrame):
         st.markdown(f"""
         <div style="margin-top:-8px;margin-bottom:14px;background:#EEF2FF;border-left:3px solid #3730A3;
                     border-radius:4px;padding:8px 12px;">
-            <div style="font-size:0.7rem;color:#3730A3;font-weight:700;text-transform:uppercase;">
-                Perfil táctico
-            </div>
+            <div style="font-size:0.7rem;color:#3730A3;font-weight:700;text-transform:uppercase;">Perfil táctico</div>
             <div style="font-size:0.95rem;font-weight:700;color:#1e1b4b;">{cluster}</div>
             <div style="font-size:0.75rem;color:#4338CA;margin-top:2px;">{cluster_desc}</div>
         </div>
@@ -256,20 +201,179 @@ def _render_player_card(row: pd.Series, title: str, df: pd.DataFrame):
 
 
 # ============================================================================
+# RADARES
+# ============================================================================
+
+def _build_general_radar(df: pd.DataFrame, pa: pd.Series, pb: pd.Series) -> go.Figure:
+    """
+    Radar de 5 ejes (uno por categoría).
+    Cada eje = media de percentiles globales de sus métricas disponibles.
+    """
+    cat_names = list(KPI_CATEGORIES.keys())
+    scores_a, scores_b = [], []
+
+    for cat, metrics in KPI_CATEGORIES.items():
+        sa, sb = [], []
+        for col, _, inv in metrics:
+            if col not in df.columns:
+                continue
+            va = _safe_float(pa.get(col, 0))
+            vb = _safe_float(pb.get(col, 0))
+            sa.append(_global_percentile(df, col, va, inv))
+            sb.append(_global_percentile(df, col, vb, inv))
+        scores_a.append(float(np.mean(sa)) if sa else 0.0)
+        scores_b.append(float(np.mean(sb)) if sb else 0.0)
+
+    name_a = str(pa.get("Name", "Jugador A"))
+    name_b = str(pb.get("Name", "Jugador B"))
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatterpolar(
+        r=scores_a + [scores_a[0]],
+        theta=cat_names + [cat_names[0]],
+        fill="toself", name=name_a,
+        line=dict(color=COLOR_A, width=2.5),
+        fillcolor=FILL_A,
+    ))
+    fig.add_trace(go.Scatterpolar(
+        r=scores_b + [scores_b[0]],
+        theta=cat_names + [cat_names[0]],
+        fill="toself", name=name_b,
+        line=dict(color=COLOR_B, width=2.5),
+        fillcolor=FILL_B,
+    ))
+    fig.update_layout(
+        title=dict(text="Radar General · Percentil global por categoría",
+                   font=dict(size=15, color="#212529"), x=0.5),
+        polar=dict(
+            radialaxis=dict(visible=True, range=[0, 100],
+                            tickvals=[20, 40, 60, 80, 100],
+                            tickfont=dict(size=9, color="#6c757d"),
+                            gridcolor="#dee2e6"),
+            angularaxis=dict(tickfont=dict(size=13, color="#212529")),
+            bgcolor="rgba(248,249,250,0.6)",
+        ),
+        showlegend=True,
+        legend=dict(orientation="h", y=-0.14, x=0.5, xanchor="center"),
+        height=520,
+        margin=dict(t=70, b=70, l=70, r=70),
+        paper_bgcolor="white",
+    )
+    return fig
+
+
+def _build_category_radar(
+    df: pd.DataFrame,
+    pa: pd.Series,
+    pb: pd.Series,
+    cat: str,
+) -> go.Figure:
+    """Radar detallado de una categoría con percentiles globales."""
+    metrics = KPI_CATEGORIES[cat]
+    labels, sa, sb = [], [], []
+
+    for col, lbl, inv in metrics:
+        if col not in df.columns:
+            continue
+        va = _safe_float(pa.get(col, 0))
+        vb = _safe_float(pb.get(col, 0))
+        labels.append(lbl)
+        sa.append(_global_percentile(df, col, va, inv))
+        sb.append(_global_percentile(df, col, vb, inv))
+
+    if not labels:
+        fig = go.Figure()
+        fig.add_annotation(text="Sin datos disponibles", showarrow=False)
+        return fig
+
+    name_a = str(pa.get("Name", "Jugador A"))
+    name_b = str(pb.get("Name", "Jugador B"))
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatterpolar(
+        r=sa + [sa[0]], theta=labels + [labels[0]],
+        fill="toself", name=name_a,
+        line=dict(color=COLOR_A, width=2), fillcolor=FILL_A,
+    ))
+    fig.add_trace(go.Scatterpolar(
+        r=sb + [sb[0]], theta=labels + [labels[0]],
+        fill="toself", name=name_b,
+        line=dict(color=COLOR_B, width=2), fillcolor=FILL_B,
+    ))
+    fig.update_layout(
+        title=dict(text=f"{cat} · Metricas detalladas (percentil global)",
+                   font=dict(size=14, color="#212529"), x=0.5),
+        polar=dict(
+            radialaxis=dict(visible=True, range=[0, 100],
+                            tickvals=[20, 40, 60, 80, 100],
+                            tickfont=dict(size=9, color="#6c757d"),
+                            gridcolor="#dee2e6"),
+            angularaxis=dict(tickfont=dict(size=11, color="#212529")),
+            bgcolor="rgba(248,249,250,0.6)",
+        ),
+        showlegend=True,
+        legend=dict(orientation="h", y=-0.14, x=0.5, xanchor="center"),
+        height=480,
+        margin=dict(t=60, b=60, l=60, r=60),
+        paper_bgcolor="white",
+    )
+    return fig
+
+
+def _category_table(
+    df: pd.DataFrame,
+    pa: pd.Series,
+    pb: pd.Series,
+    cat: str,
+) -> pd.DataFrame:
+    """Tabla valor real + percentil global para la categoría seleccionada."""
+    name_a = str(pa.get("Name", "Jugador A"))
+    name_b = str(pb.get("Name", "Jugador B"))
+    rows = []
+    for col, lbl, inv in KPI_CATEGORIES[cat]:
+        if col not in df.columns:
+            continue
+        va = _safe_float(pa.get(col, 0))
+        vb = _safe_float(pb.get(col, 0))
+        rows.append({
+            "Metrica": lbl,
+            f"{name_a}": round(va, 2),
+            f"{name_a} pctl": int(_global_percentile(df, col, va, inv)),
+            f"{name_b}": round(vb, 2),
+            f"{name_b} pctl": int(_global_percentile(df, col, vb, inv)),
+        })
+    return pd.DataFrame(rows)
+
+
+def _color_pct(val):
+    try:
+        v = int(val)
+    except Exception:
+        return ""
+    if v >= 75:
+        return "background-color:#d4edda;color:#155724;font-weight:600"
+    elif v >= 50:
+        return "background-color:#fff3cd;color:#856404;"
+    return "background-color:#f8d7da;color:#721c24;"
+
+
+# ============================================================================
 # RENDER PRINCIPAL
 # ============================================================================
 
 def render_comparador_perfiles_tab(df: pd.DataFrame):
+
     st.markdown("""
     <div style="background:linear-gradient(135deg,#1A1A2E 0%,#16213E 50%,#0F3460 100%);
                 padding:1.5rem 2rem;border-radius:14px;margin-bottom:1.5rem;border-left:5px solid #E30613;">
-        <div style="font-size:2rem;color:white;font-weight:700;">⚔️ COMPARADOR DE PERFILES</div>
+        <div style="font-size:2rem;color:white;font-weight:700;">COMPARADOR DE PERFILES</div>
         <div style="color:rgba(255,255,255,0.6);font-size:0.82rem;text-transform:uppercase;margin-top:0.25rem;">
-            Análisis comparativo con percentiles posicionales y perfiles tácticos
+            Analisis comparativo · Percentiles globales · Perfiles tacticos
         </div>
     </div>
     """, unsafe_allow_html=True)
 
+    # ── Selección de jugadores ────────────────────────────────────────────────
     comp1, comp2 = st.columns(2)
 
     with comp1:
@@ -299,42 +403,49 @@ def render_comparador_perfiles_tab(df: pd.DataFrame):
         st.warning("No se pudo localizar alguno de los jugadores.")
         return
 
+    # ── Fichas ───────────────────────────────────────────────────────────────
     st.markdown("---")
-
     top_l, top_r = st.columns(2)
     with top_l:
-        _render_player_card(row_1, "Jugador 1", df)
+        _render_player_card(row_1, "Jugador 1", COLOR_A, df)
     with top_r:
-        _render_player_card(row_2, "Jugador 2", df)
+        _render_player_card(row_2, "Jugador 2", COLOR_B, df)
 
+    # ── Radar General ─────────────────────────────────────────────────────────
     st.markdown("---")
+    st.markdown("#### Radar General")
+    st.markdown(
+        "<p style='color:#6c757d;font-size:13px;margin-top:-6px;'>"
+        "Vista global: cada eje representa la media de percentiles globales "
+        "de todas las metricas de esa categoria.</p>",
+        unsafe_allow_html=True,
+    )
 
-    fig = _build_radar(row_1, row_2, df)
+    col_gen, col_exec = st.columns([2, 1], gap="large")
 
-    col_graph, col_expl = st.columns([2, 1], gap="large")
+    with col_gen:
+        fig_gen = _build_general_radar(df, row_1, row_2)
+        st.plotly_chart(fig_gen, use_container_width=True)
+        st.caption("Percentiles globales (0-100) respecto a todo el dataset.")
 
-    with col_graph:
-        st.plotly_chart(fig, width="stretch")
-        st.caption("Percentiles posicionales (0-100) respecto a jugadores de la misma demarcación.")
-
-    with col_expl:
+    with col_exec:
         st.markdown("#### Lectura ejecutiva")
 
         if "Average Sofascore Rating" in df.columns:
             r1 = _safe_float(row_1.get("Average Sofascore Rating", 0))
             r2 = _safe_float(row_2.get("Average Sofascore Rating", 0))
-            st.metric(jugador_1, f"{r1:.2f}", label_visibility="visible")
+            st.metric(jugador_1, f"{r1:.2f}")
             st.metric(jugador_2, f"{r2:.2f}", f"{r2 - r1:+.2f}")
 
         if "Accurate passes %" in df.columns:
             p1 = _safe_float(row_1.get("Accurate passes %", 0))
             p2 = _safe_float(row_2.get("Accurate passes %", 0))
-            st.markdown("**Precisión de pase**")
+            st.markdown("**Precision de pase**")
             st.progress(min(int(p1), 100), text=f"{jugador_1}: {p1:.1f}%")
             st.progress(min(int(p2), 100), text=f"{jugador_2}: {p2:.1f}%")
 
         st.markdown("---")
-        if st.button("Añadir Jugador 2 a cartera", key="cmp_add_j2_v3", width="stretch"):
+        if st.button("Añadir Jugador 2 a cartera", key="cmp_add_j2_v4", use_container_width=True):
             if "watchlist" not in st.session_state:
                 st.session_state.watchlist = []
             if jugador_2 not in st.session_state.watchlist:
@@ -343,9 +454,47 @@ def render_comparador_perfiles_tab(df: pd.DataFrame):
             else:
                 st.info(f"{jugador_2} ya estaba en cartera.")
 
-    # ── Tabla comparativa ────────────────────────────────────────────────
+    # ── Radares detallados por categoría ──────────────────────────────────────
     st.markdown("---")
-    st.markdown("#### Tabla comparativa")
+    st.markdown("#### Radar Detallado por Categoria")
+    st.markdown(
+        "<p style='color:#6c757d;font-size:13px;margin-top:-6px;'>"
+        "Selecciona una categoria para ver el radar con todas sus metricas individuales.</p>",
+        unsafe_allow_html=True,
+    )
+
+    selected_cat = st.radio(
+        "Categoria",
+        list(KPI_CATEGORIES.keys()),
+        format_func=lambda c: CAT_ICONS.get(c, c),
+        horizontal=True,
+        key="comp_cat_radio",
+    )
+
+    col_det, col_tbl = st.columns([3, 2], gap="large")
+
+    with col_det:
+        fig_det = _build_category_radar(df, row_1, row_2, selected_cat)
+        st.plotly_chart(fig_det, use_container_width=True)
+
+    with col_tbl:
+        st.markdown(f"**Metricas · {selected_cat}**")
+        tbl = _category_table(df, row_1, row_2, selected_cat)
+        if not tbl.empty:
+            pct_cols = [c for c in tbl.columns if "pctl" in c]
+            styled = tbl.style.map(_color_pct, subset=pct_cols)
+            st.dataframe(styled, use_container_width=True, hide_index=True)
+        else:
+            st.info("Sin datos disponibles para esta categoria.")
+
+    st.caption(
+        "Verde >= 75 · Amarillo >= 50 · Rojo < 50  |  "
+        "Metricas negativas (errores, faltas) invertidas: mayor percentil = mejor."
+    )
+
+    # ── Tabla comparativa completa ────────────────────────────────────────────
+    st.markdown("---")
+    st.markdown("#### Tabla comparativa general")
 
     rows = []
     for col, label in COMPARISON_METRICS:
@@ -354,15 +503,16 @@ def render_comparador_perfiles_tab(df: pd.DataFrame):
         va = row_1.get(col)
         vb = row_2.get(col)
         rows.append({
-            "Métrica": label,
-            "Jugador 1": round(_safe_float(va), 2) if pd.notna(va) else "N/D",
-            "Jugador 2": round(_safe_float(vb), 2) if pd.notna(vb) else "N/D",
-            "Diferencia": round(_safe_float(vb) - _safe_float(va), 2) if pd.notna(va) or pd.notna(vb) else "N/D",
+            "Metrica": label,
+            jugador_1: round(_safe_float(va), 2) if pd.notna(va) else None,
+            jugador_2: round(_safe_float(vb), 2) if pd.notna(vb) else None,
+            "Diferencia": round(_safe_float(vb) - _safe_float(va), 2)
+                          if (pd.notna(va) and pd.notna(vb)) else None,
         })
 
-    st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
+    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
-    # ── Similares ────────────────────────────────────────────────────────
+    # ── Jugadores similares ───────────────────────────────────────────────────
     st.markdown("---")
     st.markdown("#### Jugadores similares")
 
@@ -370,22 +520,26 @@ def render_comparador_perfiles_tab(df: pd.DataFrame):
 
     with sim_col1:
         st.markdown(f"**Similares a {jugador_1}**")
-        pos_1 = str(row_1.get("posicion", ""))
+        pos_1 = validate_position(row_1.get("posicion"))
         if pos_1:
             sim_1 = find_similar_players(df, jugador_1, pos_1, top_n=5)
             if not sim_1.empty:
                 cols = [c for c in ["Name", "tm_club", "cluster_label", "similarity"] if c in sim_1.columns]
-                st.dataframe(sim_1[cols], width="stretch", hide_index=True)
+                st.dataframe(sim_1[cols], use_container_width=True, hide_index=True)
             else:
                 st.caption("No se encontraron similares.")
+        else:
+            st.caption("Posicion no reconocida.")
 
     with sim_col2:
         st.markdown(f"**Similares a {jugador_2}**")
-        pos_2 = str(row_2.get("posicion", ""))
+        pos_2 = validate_position(row_2.get("posicion"))
         if pos_2:
             sim_2 = find_similar_players(df, jugador_2, pos_2, top_n=5)
             if not sim_2.empty:
                 cols = [c for c in ["Name", "tm_club", "cluster_label", "similarity"] if c in sim_2.columns]
-                st.dataframe(sim_2[cols], width="stretch", hide_index=True)
+                st.dataframe(sim_2[cols], use_container_width=True, hide_index=True)
             else:
                 st.caption("No se encontraron similares.")
+        else:
+            st.caption("Posicion no reconocida.")

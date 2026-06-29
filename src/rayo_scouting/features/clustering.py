@@ -34,6 +34,7 @@ from features.feature_engineering import (
     FeatureMatrix,
     build_feature_matrix,
     get_player_vector,
+    validate_position,  
 )
 
 
@@ -92,6 +93,11 @@ def get_or_build_clusters(df: pd.DataFrame, position: str) -> tuple[FeatureMatri
         - cluster_ids: array de ints con el cluster de cada jugador
         - cluster_names: lista de nombres legibles para cada jugador
     """
+    # Normalizar y validar posición antes de cualquier operación
+    canonical = validate_position(position)
+    if canonical is None:
+        raise ValueError(f"[CLUSTERING] Posición no reconocible: {position!r}")
+    position = canonical  
     key = _cache_key(position)
 
     if key in st.session_state:
@@ -177,6 +183,11 @@ def enrich_df_with_clusters(df: pd.DataFrame) -> pd.DataFrame:
     df["cluster_id"] = -1
 
     for position in ["Defensa", "Centrocampista", "Delantero", "Portero"]:
+        logger.warning("")
+        logger.warning("=" * 70)
+        logger.warning("[DEBUG] Procesando %s", position)
+        logger.warning("=" * 70)
+
         try:
             fm, cluster_ids, cluster_names = get_or_build_clusters(df, position)
 
@@ -193,8 +204,11 @@ def enrich_df_with_clusters(df: pd.DataFrame) -> pd.DataFrame:
                     df.loc[idx, "cluster_label"] = cluster_names[i]
                     df.loc[idx, "cluster_id"] = int(cluster_ids[i])
 
-        except Exception as e:
-            logger.warning("[CLUSTERING] Error construyendo clusters para '%s': %s", position, e)
+        except Exception:
+            logger.exception(
+                "[DEBUG] ERROR COMPLETO EN %s",
+                position,
+            )
 
     n_labeled = (df["cluster_label"].notna()).sum()
     logger.warning("[CLUSTERING] Jugadores etiquetados con cluster: %d / %d", n_labeled, len(df))
@@ -212,10 +226,10 @@ def find_similar_players(
     position: str,
     top_n: int = 10,
 ) -> pd.DataFrame:
-    """
-    Encuentra los jugadores más similares usando cosine similarity
-    sobre el espacio ponderado de features.
-    """
+    # Validar posición — captura NaN, "nan", None, ""
+    if validate_position(position) is None:
+        logger.warning("[SIMILITUD] Posición inválida para '%s': %r", player_name, position)
+        return pd.DataFrame()
     try:
         fm, cluster_ids, cluster_names = get_or_build_clusters(df, position)
     except Exception as e:
@@ -342,3 +356,55 @@ def get_cluster_for_player(df: pd.DataFrame, player_name: str, position: str) ->
 
     idx = mask.idxmax()
     return cluster_names[idx]
+
+# En clustering.py — añadir estas dos funciones
+
+_WARMUP_KEY = "_clusters_warmed_up"
+
+def warmup_all_clusters(df: pd.DataFrame) -> None:
+    """
+    Preconstruye los clusters de las 4 posiciones y los guarda en caché.
+    Debe llamarse UNA SOLA VEZ al inicio de la app, antes del primer render
+    de cualquier tab que use clustering.
+
+    Evita el bug de rerun: si cada tab construye sus clusters on-demand,
+    cada escritura en st.session_state dispara un rerun de Streamlit,
+    creando un loop donde Centrocampista y Portero nunca terminan.
+    """
+    if st.session_state.get(_WARMUP_KEY):
+        return  # ya calentado, no hacer nada
+
+    logger.warning("[CLUSTERING] Precalentando clusters para todas las posiciones...")
+
+    for position in ["Defensa", "Centrocampista", "Delantero", "Portero"]:
+        key = _cache_key(position)
+        if key in st.session_state:
+            continue  # este ya está, saltar
+        try:
+            # Construir sin usar get_or_build_clusters para controlar
+            # exactamente cuándo escribimos en session_state
+            from features.feature_engineering import build_feature_matrix
+            from sklearn.cluster import KMeans
+
+            fm = build_feature_matrix(df, position)
+            n_clusters = N_CLUSTERS.get(position, 4)
+            kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+            cluster_ids = kmeans.fit_predict(fm.X_weighted)
+            cluster_names = _assign_cluster_labels(fm, cluster_ids, position)
+
+            st.session_state[key] = {
+                "fm": fm,
+                "cluster_ids": cluster_ids,
+                "cluster_names": cluster_names,
+            }
+            logger.warning(
+                "[CLUSTERING] Precalentado '%s': %d jugadores, %d clusters",
+                position, fm.n_players, n_clusters,
+            )
+        except Exception as e:
+            logger.warning("[CLUSTERING] Error precalentando '%s': %s", position, e)
+
+    # Marcar como completado — esta es la ÚNICA escritura que dispara rerun,
+    # y ocurre después de haber guardado todos los clusters
+    st.session_state[_WARMUP_KEY] = True
+    logger.warning("[CLUSTERING] Warmup completado.")

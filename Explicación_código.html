@@ -1,0 +1,1134 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TFM · Rayo Vallecano — Sistema de Scouting</title>
+<style>
+  :root {
+    --rayo-red: #E30613;
+    --rayo-red-dark: #A80410;
+    --rayo-red-soft: #FDE8EA;
+    --rayo-red-mid: #F7C1C1;
+    --ink: #1A1A1A;
+    --ink-mid: #555555;
+    --ink-light: #888888;
+    --surface: #FFFFFF;
+    --surface-alt: #F8F8F8;
+    --border: #E8E8E8;
+    --border-strong: #CCCCCC;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #F4F4F4;
+    color: var(--ink);
+    min-height: 100vh;
+  }
+
+  /* TOP BAR */
+  .topbar {
+    background: var(--ink);
+    padding: 14px 40px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .crest {
+    width: 36px; height: 36px;
+    background: var(--rayo-red);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 14px; color: #fff; letter-spacing: -0.5px;
+    flex-shrink: 0;
+  }
+  .topbar-title { color: #fff; font-size: 15px; font-weight: 600; }
+  .topbar-sub { color: #888; font-size: 13px; margin-left: auto; }
+
+  /* HERO */
+  .hero {
+    background: var(--ink);
+    padding: 64px 40px 56px;
+    color: #fff;
+    border-bottom: 3px solid var(--rayo-red);
+  }
+  .hero-eyebrow {
+    font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--rayo-red); font-weight: 600; margin-bottom: 16px;
+  }
+  .hero h1 {
+    font-size: 42px; font-weight: 800; line-height: 1.1;
+    letter-spacing: -1px; margin-bottom: 16px;
+  }
+  .hero h1 span { color: var(--rayo-red); }
+  .hero p { font-size: 16px; color: #aaa; max-width: 580px; line-height: 1.7; }
+
+  /* PIPELINE STRIP */
+  .pipeline {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 40px;
+    display: flex;
+    overflow-x: auto;
+    gap: 0;
+  }
+  .pipe-step {
+    padding: 20px 24px 18px;
+    border-right: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.15s;
+    flex-shrink: 0;
+    min-width: 160px;
+    position: relative;
+  }
+  .pipe-step:last-child { border-right: none; }
+  .pipe-step:hover { background: var(--surface-alt); }
+  .pipe-step.active {
+    background: var(--rayo-red-soft);
+    border-bottom: 3px solid var(--rayo-red);
+    margin-bottom: -1px;
+  }
+  .pipe-num {
+    font-size: 11px; font-weight: 700; color: var(--rayo-red);
+    letter-spacing: 1px; text-transform: uppercase; margin-bottom: 4px;
+  }
+  .pipe-label {
+    font-size: 13px; font-weight: 600; color: var(--ink); line-height: 1.3;
+  }
+  .pipe-step.active .pipe-label { color: var(--rayo-red-dark); }
+
+  /* MAIN LAYOUT */
+  .layout {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 0;
+    min-height: calc(100vh - 160px);
+  }
+
+  /* SIDEBAR */
+  .sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 28px 0;
+    position: sticky;
+    top: 57px;
+    height: calc(100vh - 57px);
+    overflow-y: auto;
+  }
+  .sidebar-section-label {
+    font-size: 10px; font-weight: 700; letter-spacing: 2px;
+    text-transform: uppercase; color: var(--ink-light);
+    padding: 0 24px 10px; margin-top: 20px;
+  }
+  .sidebar-section-label:first-child { margin-top: 0; }
+  .sidebar-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 24px; cursor: pointer;
+    transition: background 0.12s; font-size: 13px; color: var(--ink-mid);
+    border-left: 3px solid transparent;
+  }
+  .sidebar-item:hover { background: var(--surface-alt); color: var(--ink); }
+  .sidebar-item.active {
+    background: var(--rayo-red-soft); color: var(--rayo-red-dark);
+    border-left-color: var(--rayo-red); font-weight: 600;
+  }
+  .sidebar-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--border-strong); flex-shrink: 0;
+  }
+  .sidebar-item.active .sidebar-dot { background: var(--rayo-red); }
+
+  /* CONTENT AREA */
+  .content {
+    padding: 40px 48px;
+    max-width: 880px;
+  }
+
+  /* PHASE HEADER */
+  .phase-header {
+    display: flex; align-items: flex-start; gap: 20px;
+    margin-bottom: 32px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+  }
+  .phase-badge {
+    background: var(--rayo-red); color: #fff;
+    font-size: 11px; font-weight: 700; letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 6px 12px; border-radius: var(--radius-sm);
+    white-space: nowrap; flex-shrink: 0; margin-top: 4px;
+  }
+  .phase-header h2 { font-size: 26px; font-weight: 800; line-height: 1.2; letter-spacing: -0.5px; }
+  .phase-header p { font-size: 14px; color: var(--ink-mid); margin-top: 6px; line-height: 1.6; }
+
+  /* SOURCE CHIPS */
+  .sources { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .chip {
+    font-size: 11px; font-weight: 600; padding: 4px 10px;
+    border-radius: 100px; border: 1px solid var(--border-strong);
+    color: var(--ink-mid); letter-spacing: 0.3px;
+  }
+  .chip.red { background: var(--rayo-red-soft); border-color: var(--rayo-red-mid); color: var(--rayo-red-dark); }
+
+  /* OVERVIEW CARD */
+  .overview-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 28px;
+    line-height: 1.75;
+    font-size: 14px;
+    color: var(--ink-mid);
+  }
+  .overview-card strong { color: var(--ink); }
+
+  /* SECTION TITLE */
+  .section-title {
+    font-size: 11px; font-weight: 700; letter-spacing: 2px;
+    text-transform: uppercase; color: var(--rayo-red);
+    margin-bottom: 14px; margin-top: 36px;
+  }
+  .section-title:first-of-type { margin-top: 0; }
+
+  /* COMPONENT CARDS */
+  .components { display: flex; flex-direction: column; gap: 12px; }
+  .comp-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .comp-header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 16px 20px; cursor: pointer;
+    transition: background 0.12s;
+  }
+  .comp-header:hover { background: var(--surface-alt); }
+  .comp-icon {
+    width: 34px; height: 34px; border-radius: var(--radius-sm);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; flex-shrink: 0;
+    background: var(--rayo-red-soft); color: var(--rayo-red);
+  }
+  .comp-name { font-size: 14px; font-weight: 700; color: var(--ink); }
+  .comp-file { font-size: 11px; color: var(--ink-light); font-family: 'JetBrains Mono', 'Fira Code', monospace; margin-top: 1px; }
+  .comp-toggle { margin-left: auto; color: var(--ink-light); font-size: 18px; transition: transform 0.2s; }
+  .comp-card.open .comp-toggle { transform: rotate(180deg); }
+
+  .comp-body { display: none; padding: 0 20px 20px; border-top: 1px solid var(--border); }
+  .comp-card.open .comp-body { display: block; }
+
+  .comp-desc { font-size: 14px; color: var(--ink-mid); line-height: 1.7; margin-top: 16px; margin-bottom: 14px; }
+
+  /* FUNCTION LIST */
+  .fn-list { display: flex; flex-direction: column; gap: 6px; }
+  .fn-item {
+    display: flex; gap: 12px; align-items: flex-start;
+    background: var(--surface-alt); border-radius: var(--radius-sm);
+    padding: 10px 14px; font-size: 13px;
+  }
+  .fn-name { font-family: 'JetBrains Mono', 'Fira Code', monospace; color: var(--rayo-red-dark); font-size: 12px; font-weight: 600; flex-shrink: 0; padding-top: 1px; }
+  .fn-desc { color: var(--ink-mid); line-height: 1.5; }
+
+  /* KPI PILLS */
+  .kpis { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .kpi {
+    background: var(--ink); color: #fff;
+    font-size: 11px; font-weight: 600; padding: 5px 12px;
+    border-radius: 100px; letter-spacing: 0.2px;
+  }
+
+  /* FLOW BOX */
+  .flow {
+    background: var(--ink); border-radius: var(--radius);
+    padding: 20px 24px; margin-top: 16px;
+  }
+  .flow-title { font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #666; margin-bottom: 14px; }
+  .flow-steps { display: flex; flex-direction: column; gap: 0; }
+  .flow-step {
+    display: flex; gap: 14px; align-items: flex-start;
+    padding: 8px 0;
+    border-bottom: 1px solid #2a2a2a;
+    color: #ccc; font-size: 13px; line-height: 1.5;
+  }
+  .flow-step:last-child { border-bottom: none; }
+  .flow-n {
+    font-size: 10px; font-weight: 700; color: var(--rayo-red);
+    width: 18px; flex-shrink: 0; padding-top: 2px;
+  }
+
+  /* TABS DENTRO DE COMPONENTE */
+  .tab-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-top: 14px; }
+  .tab-card {
+    background: var(--rayo-red-soft); border: 1px solid var(--rayo-red-mid);
+    border-radius: var(--radius-sm); padding: 14px;
+  }
+  .tab-card-name { font-size: 13px; font-weight: 700; color: var(--rayo-red-dark); margin-bottom: 4px; }
+  .tab-card-desc { font-size: 12px; color: var(--ink-mid); line-height: 1.5; }
+
+  /* HIDDEN sections */
+  .phase-content { display: none; }
+  .phase-content.active { display: block; }
+
+  @media (max-width: 768px) {
+    .layout { grid-template-columns: 1fr; }
+    .sidebar { display: none; }
+    .content { padding: 24px 20px; }
+    .hero { padding: 40px 20px; }
+    .hero h1 { font-size: 28px; }
+    .topbar { padding: 12px 20px; }
+    .pipeline { padding: 0 20px; }
+  }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="crest">RV</div>
+  <div class="topbar-title">Rayo Vallecano · Sistema de Scouting</div>
+  <div class="topbar-sub">TFM — Documentación Técnica</div>
+</div>
+
+<div class="hero">
+  <div class="hero-eyebrow">Trabajo de Fin de Máster</div>
+  <h1>De los datos brutos<br>al <span>fichaje inteligente</span></h1>
+  <p>Un pipeline completo de análisis deportivo: desde la ingesta de eventos Opta hasta una herramienta web de scouting accionable para la dirección deportiva del Rayo Vallecano.</p>
+</div>
+
+<div class="pipeline" id="pipeline">
+  <div class="pipe-step active" data-phase="1" onclick="selectPhase(1)">
+    <div class="pipe-num">Fase 1</div>
+    <div class="pipe-label">Datos Opta &amp; Análisis de Juego</div>
+  </div>
+  <div class="pipe-step" data-phase="2" onclick="selectPhase(2)">
+    <div class="pipe-num">Fase 2</div>
+    <div class="pipe-label">Masa Salarial</div>
+  </div>
+  <div class="pipe-step" data-phase="3" onclick="selectPhase(3)">
+    <div class="pipe-num">Fase 3</div>
+    <div class="pipe-label">Fichajes Históricos</div>
+  </div>
+  <div class="pipe-step" data-phase="4" onclick="selectPhase(4)">
+    <div class="pipe-num">Fase 4</div>
+    <div class="pipe-label">Recopilación de Mercado</div>
+  </div>
+  <div class="pipe-step" data-phase="5" onclick="selectPhase(5)">
+    <div class="pipe-num">Fase 5</div>
+    <div class="pipe-label">Herramienta Web</div>
+  </div>
+</div>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar" id="sidebar">
+    <!-- populated by JS -->
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content" id="content-area">
+
+    <!-- FASE 1 -->
+    <div class="phase-content active" id="phase-1">
+      <div class="phase-header">
+        <div class="phase-badge">Fase 1</div>
+        <div>
+          <h2>Datos Opta &amp; Análisis de Juego</h2>
+          <p>Adquisición de los eventos de partido desde fuente externa, almacenamiento en la nube y construcción de una metodología de análisis táctico basada en datos.</p>
+          <div class="sources">
+            <span class="chip red">Opta</span>
+            <span class="chip">Amazon S3</span>
+            <span class="chip">Python · boto3</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="overview-card">
+        <strong>¿Por qué esta fase?</strong> Antes de saber a quién fichar hay que entender cómo juega el Rayo. Esta fase construye los cimientos: descarga los eventos de Opta, los centraliza en S3 y los transforma en indicadores tácticos interpretables partido a partido. El resultado no es solo un dataset, sino un sistema de lectura del juego que permite pasar del evento individual a un diagnóstico de temporada con vistas ejecutivas y gráficas tácticas.
+      </div>
+
+      <div class="section-title">Componentes de código</div>
+      <div class="components" id="comps-1">
+
+        <div class="comp-card" id="c1-1">
+          <div class="comp-header" onclick="toggleComp('c1-1')">
+            <div class="comp-icon">⬇</div>
+            <div>
+              <div class="comp-name">Carga de datos y conexión con S3</div>
+              <div class="comp-file">06_rayo_analisis_juego_app.py</div>
+            </div>
+            <div class="comp-toggle">⌄</div>
+          </div>
+          <div class="comp-body">
+            <p class="comp-desc">La aplicación empieza cargando los eventos de partido desde S3 con <strong>load_season_data_from_s3()</strong>, usando como entrada los catálogos de eventos y calificadores Opta. Esa capa permite que el análisis táctico se ejecute sobre un dataset ya preparado y con estructura homogénea para toda la temporada.</p>
+            <div class="fn-list">
+              <div class="fn-item"><span class="fn-name">load_data()</span><span class="fn-desc">Carga los eventos y los KPIs de temporada con caché de Streamlit para no recargar el dataset en cada interacción.</span></div>
+              <div class="fn-item"><span class="fn-name">load_season_data_from_s3()</span><span class="fn-desc">Recupera los archivos desde la fuente externa y devuelve tanto eventos como métricas agregadas por partido.</span></div>
+              <div class="fn-item"><span class="fn-name">st.cache_data</span><span class="fn-desc">Optimiza el rendimiento de la app al mantener en memoria los datos ya descargados y procesados.</span></div>
+            </div>
+            <div class="flow" style="margin-top: 18px;">
+              <div class="flow-title">Flujo de ejecución</div>
+              <div class="flow-steps">
+                <div class="flow-step"><span class="flow-n">1</span>Lectura de los catálogos Opta y carga de eventos desde la fuente externa.</div>
+                <div class="flow-step"><span class="flow-n">2</span>Construcción de un dataset de partido listo para el análisis táctico.</div>
+                <div class="flow-step"><span class="flow-n">3</span>Generación de métricas por encuentro y consolidación de la temporada.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="comp-card" id="c1-2">
+          <div class="comp-header" onclick="toggleComp('c1-2')">
+            <div class="comp-icon">⚽</div>
+            <div>
+              <div class="comp-name">Modelado del dato de partido y métricas tácticas</div>
+              <div class="comp-file">rayo_analisis_juego.py + 06_rayo_analisis_juego_app.py</div>
+            </div>
+            <div class="comp-toggle">⌄</div>
+          </div>
+          <div class="comp-body">
+            <p class="comp-desc">El conjunto de funciones del análisis transforma el evento bruto en una lectura táctica. Se calculan métricas de construcción, finalización, presión y transición para describir el estilo del equipo más allá de los resultados.</p>
+            <div class="kpis">
+              <span class="kpi">Pases progresivos</span>
+              <span class="kpi">PPDA</span>
+              <span class="kpi">Big chances</span>
+              <span class="kpi">Contragolpes</span>
+              <span class="kpi">Counterpressing %</span>
+              <span class="kpi">Altura del bloque</span>
+            </div>
+            <div class="fn-list">
+              <div class="fn-item"><span class="fn-name">build_global_summary()</span><span class="fn-desc">Resume la temporada con métricas medias y valores agregados para obtener una visión general del equipo.</span></div>
+              <div class="fn-item"><span class="fn-name">build_home_away_summary()</span><span class="fn-desc">Compara el comportamiento en casa y fuera para detectar diferencias de juego o de contexto.</span></div>
+              <div class="fn-item"><span class="fn-name">build_strengths_weaknesses()</span><span class="fn-desc">Identifica fortalezas y debilidades a partir de umbrales sobre KPIs tácticos y de rendimiento.</span></div>
+              <div class="fn-item"><span class="fn-name">build_tactical_identity()</span><span class="fn-desc">Resume el ADN del equipo en frases interpretables para presentarlo como un perfil táctico.</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="comp-card" id="c1-3">
+          <div class="comp-header" onclick="toggleComp('c1-3')">
+            <div class="comp-icon">📊</div>
+            <div>
+              <div class="comp-name">Aplicación Streamlit de inteligencia táctica</div>
+              <div class="comp-file">06_rayo_analisis_juego_app.py</div>
+            </div>
+            <div class="comp-toggle">⌄</div>
+          </div>
+          <div class="comp-body">
+            <p class="comp-desc">La app convierte el análisis en una herramienta interactiva con vistas separadas por fase del juego: construcción, último tercio, defensa, transiciones, correlaciones y un informe ejecutivo. Todo el flujo está pensado para que un analista pueda moverse de lo descriptivo a lo interpretativo sin salir de la misma interfaz.</p>
+            <div class="fn-list">
+              <div class="fn-item"><span class="fn-name">sidebar radio</span><span class="fn-desc">Navegación por secciones: Resumen, Fase ofensiva, Último tercio, Defensa, Transiciones, Correlación y Export.</span></div>
+              <div class="fn-item"><span class="fn-name">draw_pitch()</span><span class="fn-desc">Dibuja el campo en Matplotlib con líneas, áreas, tercios y círculos para representar eventos y mapas tácticos.</span></div>
+              <div class="fn-item"><span class="fn-name">compute_percentile_profile()</span><span class="fn-desc">Convierte métricas de temporada en percentiles internos para construir un radar de estilo propio.</span></div>
+              <div class="fn-item"><span class="fn-name">build_expert_export_text()</span><span class="fn-desc">Genera un bloque de texto listo para copiar y enviar a un analista experto o a un informe de scouting.</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="comp-card" id="c1-4">
+          <div class="comp-header" onclick="toggleComp('c1-4')">
+            <div class="comp-icon">🧭</div>
+            <div>
+              <div class="comp-name">Visualizaciones tácticas y diagnóstico de temporada</div>
+              <div class="comp-file">06_rayo_analisis_juego_app.py</div>
+            </div>
+            <div class="comp-toggle">⌄</div>
+          </div>
+          <div class="comp-body">
+            <p class="comp-desc">La interfaz no se limita a mostrar tablas: incorpora mapas de pases progresivos, heatmaps por tercio y carril, scatter de tiros, mapas de recuperación, evolución del PPDA, correlaciones con puntos y un radar de percentiles internos. Es la capa visual que convierte la métrica en diagnóstico táctico.</p>
+            <div class="fn-list">
+              <div class="fn-item"><span class="fn-name">mapa de flechas</span><span class="fn-desc">Representa los pases progresivos y su origen/destino para visualizar cómo se construye el ataque.</span></div>
+              <div class="fn-item"><span class="fn-name">heatmap zonal</span><span class="fn-desc">Muestra la circulación por tercios y carriles para localizar patrones de ocupación del campo.</span></div>
+              <div class="fn-item"><span class="fn-name">shot map + PPDA evolution</span><span class="fn-desc">Relaciona finalización, zonas de remate y presión defensiva en una misma lectura temporal.</span></div>
+              <div class="fn-item"><span class="fn-name">radar de percentiles</span><span class="fn-desc">Resume el perfil interno del equipo en una vista compacta que facilita comparar métricas entre dimensiones tácticas.</span></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- FASE 2 -->
+    <div class="phase-content" id="phase-2">
+      <div class="phase-header">
+        <div class="phase-badge">Fase 2</div>
+        <div>
+          <h2>Análisis de Masa Salarial</h2>
+          <p>El flujo pasa de la lectura del dato bruto a un diagnóstico económico operativo: contratos, salarios, peso por rol, compromiso restante y riesgo de ineficiencia en la plantilla.</p>
+          <div class="sources">
+            <span class="chip red">Datos internos</span>
+            <span class="chip">Python · pandas</span>
+            <span class="chip">04_analisis_rayo_salarios.ipynb</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="overview-card">
+        <strong>¿Por qué esta fase?</strong> Conocer cómo juega el Rayo no basta si no se sabe cuánto cuesta sostener ese modelo. Esta fase convierte el CSV salarial en una lectura ejecutiva: qué jugadores terminan contrato antes, quién concentra más masa salarial, qué roles están sobrecargados y qué compromisos económicos quedan por ejecutar. Es la capa que conecta rendimiento con capacidad de gasto.
+      </div>
+
+      <div class="section-title">Componentes de código</div>
+      <div class="components">
+
+        <div class="comp-card" id="c2-1">
+          <div class="comp-header" onclick="toggleComp('c2-1')">
+            <div class="comp-icon">💰</div>
+            <div>
+              <div class="comp-name">Carga y métricas ejecutivas del salario</div>
+              <div class="comp-file">04_analisis_rayo_salarios.ipynb</div>
+            </div>
+            <div class="comp-toggle">⌄</div>
+          </div>
+          <div class="comp-body">
+            <p class="comp-desc">El notebook comienza cargando el fichero <strong>rayo_vallecano_salarios.csv</strong> y transforma la tabla en un set de KPIs que sirven para priorizar decisiones de plantilla. En vez de mirar salarios aislados, el flujo agrupa la información por contrato, rol y posición para ver dónde está el coste real del equipo.</p>
+            <div class="fn-list">
+              <div class="fn-item"><span class="fn-name">sort_values('Años restantes')</span><span class="fn-desc">Prioriza los jugadores con contrato más cerca del final, que son los que más riesgo de renovación o salida generan.</span></div>
+              <div class="fn-item"><span class="fn-name">sort_values('Total anual (EUR)')</span><span class="fn-desc">Identifica a los jugadores más caros en coste anual y semanal, incluyendo reservas y titulares.</span></div>
+              <div class="fn-item"><span class="fn-name">groupby('Rol')</span><span class="fn-desc">Calcula masa salarial, edad media y distribución de coste por rol, útil para detectar desequilibrios entre plantilla y modelo de juego.</span></div>
+              <div class="fn-item"><span class="fn-name">groupby('Posición')</span><span class="fn-desc">Mide la media salarial por demarcación y ayuda a entender si el gasto está alineado con la estructura táctica del equipo.</span></div>
+            </div>
+            <div class="flow" style="margin-top: 18px;">
+              <div class="flow-title">Flujo de la fase</div>
+              <div class="flow-steps">
+                <div class="flow-step"><span class="flow-n">1</span>Carga del CSV salarial y revisión de columnas clave: contrato, salario, rol, posición y cláusula.</div>
+                <div class="flow-step"><span class="flow-n">2</span>Ordenación por años restantes, salario anual/semanal y compromiso económico pendiente.</div>
+                <div class="flow-step"><span class="flow-n">3</span>Agrupación por rol y posición para convertir el dato en indicadores de estructura y gasto.</div>
+                <div class="flow-step"><span class="flow-n">4</span>Generación de una vista ejecutiva para decidir dónde hay presión contractual o sobrecoste.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="comp-card" id="c2-2">
+          <div class="comp-header" onclick="toggleComp('c2-2')">
+            <div class="comp-icon">⚠</div>
+            <div>
+              <div class="comp-name">Riesgos, ineficiencias y margen de maniobra</div>
+              <div class="comp-file">salary_analysis.py</div>
+            </div>
+            <div class="comp-toggle">⌄</div>
+          </div>
+          <div class="comp-body">
+            <p class="comp-desc">La segunda capa del análisis toma esos indicadores y los convierte en señales de decisión. No solo se mira el coste, sino el valor relativo: si un jugador tiene un salario alto pero no aporta el rol que la plantilla necesita, o si un contrato próximo a vencer concentra demasiado peso dentro del presupuesto.</p>
+            <div class="fn-list">
+              <div class="fn-item"><span class="fn-name">contratos próximos a vencer</span><span class="fn-desc">Se priorizan los jugadores con menos tiempo de contrato, porque son los que mayor incertidumbre generan para la planificación.</span></div>
+              <div class="fn-item"><span class="fn-name">salario alto / rol bajo</span><span class="fn-desc">Se detectan perfiles con coste elevado y menor protagonismo, un patrón habitual de ineficiencia salarial.</span></div>
+              <div class="fn-item"><span class="fn-name">compromiso económico restante</span><span class="fn-desc">Se cuantifica cuánto importe queda por ejecutar todavía en la relación contractual del jugador.</span></div>
+              <div class="fn-item"><span class="fn-name">cláusulas de rescisión</span><span class="fn-desc">Se revisan los valores de salida para estimar el coste de modificar la plantilla en un escenario de mercado.</span></div>
+            </div>
+            <div class="flow" style="margin-top: 18px;">
+              <div class="flow-title">Flujo de la fase</div>
+              <div class="flow-steps">
+                <div class="flow-step"><span class="flow-n">1</span>Se cruzan los salarios con el rol real del jugador para medir si el coste está alineado con su impacto.</div>
+                <div class="flow-step"><span class="flow-n">2</span>Se marca la exposición contractual: años restantes, importe pendiente y cláusula de rescisión.</div>
+                <div class="flow-step"><span class="flow-n">3</span>Se comparan los resultados con la estructura de la plantilla para detectar desequilibrios por posición.</div>
+                <div class="flow-step"><span class="flow-n">4</span>El resultado es una visión útil para negociar, renovar, ceder o incorporar jugadores con criterio.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- FASE 3 -->
+    <div class="phase-content" id="phase-3">
+      <div class="phase-header">
+        <div class="phase-badge">Fase 3</div>
+        <div>
+          <h2>Análisis de Fichajes Históricos</h2>
+          <p>El flujo recorre la historia de mercado del Rayo para extraer patrones reales: qué tipo de fichaje ha funcionado, a qué precio y desde qué origen.</p>
+          <div class="sources">
+            <span class="chip red">Transfermarkt</span>
+            <span class="chip">Opta (rendimiento)</span>
+            <span class="chip">05_analisis_fichajes.py</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="overview-card">
+        <strong>¿Por qué esta fase?</strong> El pasado es la mejor guía para calibrar el presente. Este bloque analiza fichajes del Rayo en un periodo amplio y los convierte en señales de decisión: si los mejores resultados aparecen en cierto rango de edad, con cierto tipo de operación o desde ciertas ligas, esa información debe reproducirse al filtrar el mercado actual. La fase no se limita a listar incorporaciones, sino a detectar qué variables han diferenciado éxitos y fracasos.
+      </div>
+
+      <div class="section-title">Dimensiones de análisis</div>
+      <div class="components">
+
+        <div class="comp-card" id="c3-1">
+          <div class="comp-header" onclick="toggleComp('c3-1')">
+            <div class="comp-icon">📁</div>
+            <div>
+              <div class="comp-name">Limpieza, contexto y variables de fichaje</div>
+              <div class="comp-file">05_analisis_fichajes.py</div>
+            </div>
+            <div class="comp-toggle">⌄</div>
+          </div>
+          <div class="comp-body">
+            <p class="comp-desc">El script empieza normalizando el dataset de fichajes y preparando una base analítica estable. Se limpian los textos de rendimiento, se transforma el coste de cada operación y se derivan variables que luego servirán para comparar fichajes entre sí con coherencia.</p>
+            <div class="fn-list">
+              <div class="fn-item"><span class="fn-name">parse_coste()</span><span class="fn-desc">Convierte cada operación en una categoría homogénea: Libre, Cesión o Traspaso, y asigna valor numérico cuando aplica.</span></div>
+              <div class="fn-item"><span class="fn-name">Rendimiento_clean</span><span class="fn-desc">Normaliza la descripción de rendimiento para convertirla en una variable de clasificación consistente.</span></div>
+              <div class="fn-item"><span class="fn-name">Temporada_start / Es_Liga_Española / Tipo_Coste</span><span class="fn-desc">Genera variables contextuales que luego se usan para comparar por temporada, liga de origen y tipo de operación.</span></div>
+            </div>
+            <div class="flow" style="margin-top: 18px;">
+              <div class="flow-title">Flujo de la fase</div>
+              <div class="flow-steps">
+                <div class="flow-step"><span class="flow-n">1</span>Se carga el CSV con fichajes históricos y se limpia la columna de rendimiento.</div>
+                <div class="flow-step"><span class="flow-n">2</span>Se transforma el coste en una variable numérica y en un tipo de operación (libre, cesión, traspaso).</div>
+                <div class="flow-step"><span class="flow-n">3</span>Se derivan variables de contexto: temporada, liga de procedencia y si el origen era español o no.</div>
+                <div class="flow-step"><span class="flow-n">4</span>El resultado alimenta el análisis comparativo de rendimiento y coste.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="comp-card" id="c3-2">
+          <div class="comp-header" onclick="toggleComp('c3-2')">
+            <div class="comp-icon">✓</div>
+            <div>
+              <div class="comp-name">Comparación de rendimiento, coste y origen</div>
+              <div class="comp-file">05_analisis_fichajes.py</div>
+            </div>
+            <div class="comp-toggle">⌄</div>
+          </div>
+          <div class="comp-body">
+            <p class="comp-desc">La segunda parte del pipeline ya no describe fichajes de forma aislada, sino que los compara. El script construye distribuciones de rendimiento, cruces por tipo de operación, perfiles de edad, evolución del coste y tasas de éxito por liga de procedencia para convertir el histórico en reglas de decisión.</p>
+            <div class="fn-list">
+              <div class="fn-item"><span class="fn-name">value_counts()</span><span class="fn-desc">Mide cuántos fichajes caen en cada categoría de rendimiento, de forma que se ve si el club ha tendido a acertar o a incorporar perfiles funcionales.</span></div>
+              <div class="fn-item"><span class="fn-name">crosstab(Tipo_Coste, Rendimiento_clean)</span><span class="fn-desc">Compara si los fichajes libres, en cesión o por traspaso han producido mejor o peor resultado.</span></div>
+              <div class="fn-item"><span class="fn-name">groupby('Rendimiento_clean')['Edad en el fichaje'].mean()</span><span class="fn-desc">Revela si el club ha priorizado perfiles jóvenes o más experimentados en los momentos de mayor impacto.</span></div>
+              <div class="fn-item"><span class="fn-name">scatter + league bar chart</span><span class="fn-desc">Relaciona coste de traspaso con rendimiento y evalúa el porcentaje de éxito por liga de procedencia, útil para afinar el scouting.</span></div>
+            </div>
+            <div class="flow" style="margin-top: 18px;">
+              <div class="flow-title">Flujo de la fase</div>
+              <div class="flow-steps">
+                <div class="flow-step"><span class="flow-n">1</span>Se calcula la distribución general de rendimiento y se compara con el tipo de operación del fichaje.</div>
+                <div class="flow-step"><span class="flow-n">2</span>Se estudia la edad en el momento del fichaje para entender el perfil de incorporación preferido por el club.</div>
+                <div class="flow-step"><span class="flow-n">3</span>Se visualiza la relación entre coste y rendimiento, así como la tasa de éxito por liga de procedencia.</div>
+                <div class="flow-step"><span class="flow-n">4</span>Se exporta la gráfica final como <strong>analisis_fichajes.png</strong> para convertir el resultado en un producto visual de apoyo.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- FASE 4 -->
+    <div class="phase-content" id="phase-4">
+      <div class="phase-header">
+        <div class="phase-badge">Fase 4</div>
+        <div>
+          <h2>Recopilación de Jugadores del Mercado</h2>
+          <p>Construcción del universo de búsqueda: estadísticas de rendimiento y datos contractuales de jugadores de 12 ligas en Europa, Argentina y USA.</p>
+          <div class="sources">
+            <span class="chip red">Sofascore</span>
+            <span class="chip red">Transfermarkt</span>
+            <span class="chip">Python · scraping</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="overview-card">
+        <strong>¿Por qué esta fase?</strong> Con el perfil del jugador ideal ya definido (gracias a las fases anteriores), esta fase construye el universo de candidatos sobre el que operar. Se recopilan datos de dos fuentes complementarias: Sofascore para el rendimiento deportivo y Transfermarkt para los datos económicos y contractuales. La cobertura abarca 12 ligas para no limitar el scouting a mercados conocidos.
+      </div>
+
+      <div class="section-title">Ligas cubiertas</div>
+      <div class="comp-card" id="c4-ligas" style="margin-bottom: 12px;">
+        <div class="comp-header" onclick="toggleComp('c4-ligas')">
+          <div class="comp-icon">🌍</div>
+          <div>
+            <div class="comp-name">Cobertura de Competiciones</div>
+            <div class="comp-file">12 ligas · 5 países</div>
+          </div>
+          <div class="comp-toggle">⌄</div>
+        </div>
+        <div class="comp-body">
+          <div class="fn-list" style="margin-top: 14px;">
+            <div class="fn-item"><span class="fn-name">🇪🇸 España</span><span class="fn-desc">LaLiga Santander + LaLiga SmartBank</span></div>
+            <div class="fn-item"><span class="fn-name">🇬🇧 Inglaterra</span><span class="fn-desc">Premier League + Championship</span></div>
+            <div class="fn-item"><span class="fn-name">🇮🇹 Italia</span><span class="fn-desc">Serie A + Serie B</span></div>
+            <div class="fn-item"><span class="fn-name">🇩🇪 Alemania</span><span class="fn-desc">Bundesliga + 2. Bundesliga</span></div>
+            <div class="fn-item"><span class="fn-name">🇫🇷 Francia</span><span class="fn-desc">Ligue 1 + Ligue 2</span></div>
+            <div class="fn-item"><span class="fn-name">🇦🇷 Argentina</span><span class="fn-desc">Liga Profesional de Fútbol</span></div>
+            <div class="fn-item"><span class="fn-name">🇺🇸 USA/CAN</span><span class="fn-desc">Major League Soccer (MLS)</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-title">Componentes de código</div>
+      <div class="components">
+
+        <div class="comp-card" id="c4-1">
+          <div class="comp-header" onclick="toggleComp('c4-1')">
+            <div class="comp-icon">🧱</div>
+            <div>
+              <div class="comp-name">Scraping de Plantillas — Transfermarkt</div>
+              <div class="comp-file">01_scraping_transfermarket.ipynb</div>
+            </div>
+            <div class="comp-toggle">⌄</div>
+          </div>
+          <div class="comp-body">
+            <p class="comp-desc">A partir de un Excel con el link base de cada club (columna "Transfermarkt"), se reconstruye la URL de la plantilla ("kader") de la temporada 2025 añadiendo el parámetro plus/1, que despliega columnas extendidas (altura, pie dominante, club anterior, coste de traspaso). Selenium en modo headless abre cada plantilla, espera con WebDriverWait a que cargue la tabla del XPath //*[@id="yw1"]/table y BeautifulSoup parsea fila a fila (10 columnas por jugador) extrayendo dorsal, posición, nombre, fecha de nacimiento, edad, nacionalidades, altura, pie, fecha de fichaje, club anterior y coste de traspaso, fin de contrato y valor de mercado.</p>
+            <div class="fn-list">
+              <div class="fn-item"><span class="fn-name">transformar_link()</span><span class="fn-desc">Reescribe la URL de cada club al formato .../kader/verein/{id}/saison_id/2025/plus/1</span></div>
+              <div class="fn-item"><span class="fn-name">tds[0..9]</span><span class="fn-desc">Cada &lt;td&gt; de la fila mapea a un campo: número+posición, nombre+perfil, nacimiento/edad, nacionalidades (atributo title de las banderas), altura, pie, fecha de fichaje, club anterior+coste, fin de contrato, valor de mercado</span></div>
+              <div class="fn-item"><span class="fn-name">last_index.txt + checkpoint CSV</span><span class="fn-desc">El bucle por club guarda el CSV tras cada equipo y persiste el último índice procesado, permitiendo reanudar el scraping si se interrumpe</span></div>
+              <div class="fn-item"><span class="fn-name">time.sleep(random 3–7s)</span><span class="fn-desc">Pausa aleatoria entre clubes para reducir el riesgo de bloqueo por comportamiento de bot</span></div>
+            </div>
+            <div class="flow" style="margin-top: 18px;">
+              <div class="flow-title">Flujo de ejecución</div>
+              <div class="flow-steps">
+                <div class="flow-step"><span class="flow-n">1</span> Lectura del Excel de clubes y generación de URLs "kader" con plus/1</div>
+                <div class="flow-step"><span class="flow-n">2</span> Apertura headless de Chrome (Selenium) y navegación a la plantilla del club</div>
+                <div class="flow-step"><span class="flow-n">3</span> Espera explícita a la carga de la tabla y extracción del HTML con outerHTML</div>
+                <div class="flow-step"><span class="flow-n">4</span> Parseo de cada fila &lt;tr&gt; con BeautifulSoup → diccionario de 14 campos por jugador</div>
+                <div class="flow-step"><span class="flow-n">5</span> Guardado incremental en CSV y actualización del checkpoint · salida: jugadores_transfermarket.csv</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="comp-card" id="c4-2">
+          <div class="comp-header" onclick="toggleComp('c4-2')">
+            <div class="comp-icon">🔗</div>
+            <div>
+              <div class="comp-name">Resolución de Perfiles e Imágenes</div>
+              <div class="comp-file">transfermarkt_links_scraper.py</div>
+            </div>
+            <div class="comp-toggle">⌄</div>
+          </div>
+          <div class="comp-body">
+            <p class="comp-desc">Script complementario (vía requests + BeautifulSoup, sin navegador) que parte de las listas de equipos y jugadores únicos detectados en el dataset y los busca en el buscador rápido de Transfermarkt para resolver su URL de perfil oficial y su imagen (escudo o foto). La coincidencia de nombres no es exacta: se usa rapidfuzz (token_sort_ratio) sobre nombres normalizados (sin tildes, en minúscula) para puntuar a todos los candidatos devueltos por el buscador y quedarse con el de mayor score.</p>
+            <div class="fn-list">
+              <div class="fn-item"><span class="fn-name">normalize_text() / fix_text()</span><span class="fn-desc">Quita tildes, pasa a minúsculas y corrige problemas de codificación (mojibake) típicos del scraping web</span></div>
+              <div class="fn-item"><span class="fn-name">score_candidate()</span><span class="fn-desc">Fuzzy matching con rapidfuzz para emparejar el nombre del Excel con el nombre encontrado en Transfermarkt</span></div>
+              <div class="fn-item"><span class="fn-name">enrich_team_page() / enrich_player_page()</span><span class="fn-desc">Visita la página del perfil ya resuelto para extraer el logo del club o la foto del jugador</span></div>
+              <div class="fn-item"><span class="fn-name">load_existing_csv()</span><span class="fn-desc">Reanuda el proceso saltando los nombres ya resueltos en ejecuciones previas, igual que el scraper de plantillas</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="comp-card" id="c4-3">
+          <div class="comp-header" onclick="toggleComp('c4-3')">
+            <div class="comp-icon">⚡</div>
+            <div>
+              <div class="comp-name">Scraper Multi-Liga — Sofascore</div>
+              <div class="comp-file">02_scraping_sofascore.ipynb</div>
+            </div>
+            <div class="comp-toggle">⌄</div>
+          </div>
+          <div class="comp-body">
+            <p class="comp-desc">Clase SofaScoreScraper orientada a objetos que automatiza, para cada una de las 12 ligas configuradas en el diccionario LIGAS, la navegación por las 6 pestañas de estadísticas de jugadores (General, Attack, Defense, Passing, Goalkeeping, Detailed) identificadas por su data-testid. Para evitar la detección como bot, el driver de Chrome se lanza con --disable-blink-features=AutomationControlled y sobreescribe navigator.webdriver vía JavaScript. Dentro de cada pestaña recorre la paginación haciendo clic en el botón "›" hasta que aparece deshabilitado, extrayendo cabeceras y filas de la tabla en cada página.</p>
+            <div class="fn-list">
+              <div class="fn-item"><span class="fn-name">_cambiar_pestana()</span><span class="fn-desc">Localiza el botón de cada pestaña por data-testid (tab-summary, tab-attack, tab-defence...) y hace scroll + click, con reintento por JS si el click normal falla</span></div>
+              <div class="fn-item"><span class="fn-name">_extraer_tabla() / _siguiente_pagina()</span><span class="fn-desc">Lee cabeceras (atributo title) y filas de la tabla visible, y avanza de página hasta agotar el paginador</span></div>
+              <div class="fn-item"><span class="fn-name">Checkpoint (JSON)</span><span class="fn-desc">Persiste qué pestañas de cada liga ya se completaron; si el scraper falla a mitad, retoma sin repetir trabajo</span></div>
+              <div class="fn-item"><span class="fn-name">Guardado incremental cada 5 páginas</span><span class="fn-desc">Escribe un CSV parcial cada 5 páginas dentro de una pestaña, por si el proceso se corta antes de terminar la liga</span></div>
+              <div class="fn-item"><span class="fn-name">_cerrar_cookies() / _limpiar_overlays()</span><span class="fn-desc">Gestiona banners de consentimiento y overlays modales que bloquean los clics en la tabla</span></div>
+            </div>
+            <div class="flow" style="margin-top: 18px;">
+              <div class="flow-title">Flujo de ejecución por liga</div>
+              <div class="flow-steps">
+                <div class="flow-step"><span class="flow-n">1</span> Inicializa el driver y navega a la URL de la liga (cierra cookies, limpia overlays)</div>
+                <div class="flow-step"><span class="flow-n">2</span> Para cada una de las 6 pestañas: cambia de pestaña, recorre la paginación y acumula filas</div>
+                <div class="flow-step"><span class="flow-n">3</span> Guarda un CSV por pestaña en sofascore_data/{liga}/raw/ y marca la pestaña como completada en el checkpoint</div>
+                <div class="flow-step"><span class="flow-n">4</span> Repite para las 12 ligas configuradas en LIGAS_A_SCRAPEAR</div>
+                <div class="flow-step"><span class="flow-n">5</span> Lanza el merge de pestañas al finalizar cada liga · salida: {liga}_players_unified.csv</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="comp-card" id="c4-4">
+          <div class="comp-header" onclick="toggleComp('c4-4')">
+            <div class="comp-icon">🧩</div>
+            <div>
+              <div class="comp-name">Unificación de Pestañas por Jugador</div>
+              <div class="comp-file">MergePestanas (clase, Celda 6)</div>
+            </div>
+            <div class="comp-toggle">⌄</div>
+          </div>
+          <div class="comp-body">
+            <p class="comp-desc">Cada pestaña de Sofascore (General, Attack, Defense, Passing, Goalkeeping) se descarga como un CSV independiente y hay que unirlas en una sola fila por jugador. Un mismo nombre puede llegar con variantes mínimas entre pestañas (p. ej. "Vinícius" vs "Vinicius"), y columnas como Goals aparecen repetidas en varias pestañas. La clase corrige dos problemas detectados durante el desarrollo: un outer join que duplicaba filas por esas variantes de nombre, y columnas repetidas que pandas promediaba silenciosamente al fusionar (provocando valores imposibles como 2.5 goles).</p>
+            <div class="fn-list">
+              <div class="fn-item"><span class="fn-name">LEFT JOIN sobre Attack</span><span class="fn-desc">Se usa Attack como tabla base en vez de outer join, evitando que las variantes de nombre multipliquen filas</span></div>
+              <div class="fn-item"><span class="fn-name">COLUMNA_FUENTE_PRIORITARIA</span><span class="fn-desc">Diccionario que define, para columnas duplicadas entre pestañas (Goals, xG, Tackles, Assists...), cuál pestaña "gana"; el resto se descarta antes del merge</span></div>
+              <div class="fn-item"><span class="fn-name">PESTANAS_DESCARTAR</span><span class="fn-desc">Detailed y General se excluyen del merge final (General solo aporta el Average Rating)</span></div>
+              <div class="fn-item"><span class="fn-name">groupby().first() final</span><span class="fn-desc">Deduplicación de seguridad por clave de jugador normalizada, por si aún quedara algún duplicado tras el join</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="comp-card" id="c4-5">
+          <div class="comp-header" onclick="toggleComp('c4-5')">
+            <div class="comp-icon">💶</div>
+            <div>
+              <div class="comp-name">Cruce con Datos Económicos — Transfermarkt</div>
+              <div class="comp-file">merge_con_transfermarket.py (Celda 9)</div>
+            </div>
+            <div class="comp-toggle">⌄</div>
+          </div>
+          <div class="comp-body">
+            <p class="comp-desc">Une el CSV unificado de rendimiento de cada liga (Sofascore) con el dataset de Transfermarkt, incorporando club, posición, edad, nacionalidad, fin de contrato y valor de mercado. El cruce se hace en dos fases: primero un match exacto por nombre normalizado (sin tildes, minúsculas) y, para los jugadores sin coincidencia, un segundo paso de fuzzy matching con difflib.SequenceMatcher (umbral 0.88) contra el resto de nombres de esa misma liga en Transfermarkt. El resultado se valida (detecta xG en 0 para toda la liga, goles fuera de rango, etc.) antes de guardarse como CSV maestro por liga.</p>
+            <div class="fn-list">
+              <div class="fn-item"><span class="fn-name">LIGA_MAP</span><span class="fn-desc">Traduce la clave interna de cada liga (ej. "laliga2") al nombre exacto usado en el dataset de Transfermarkt ("LaLiga Hypermotion")</span></div>
+              <div class="fn-item"><span class="fn-name">Match exacto + fuzzy_match()</span><span class="fn-desc">Primero cruza por clave normalizada exacta; los huecos restantes se resuelven por similitud de texto con umbral 0.88</span></div>
+              <div class="fn-item"><span class="fn-name">% de cobertura por liga</span><span class="fn-desc">Imprime el porcentaje de jugadores con match exacto, los recuperados por fuzzy y los que quedan sin dato económico</span></div>
+              <div class="fn-item"><span class="fn-name">all_leagues_master_v3.csv</span><span class="fn-desc">Combinación final de los CSV maestros de las 12 ligas en un único dataset de mercado</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="comp-card" id="c4-6">
+          <div class="comp-header" onclick="toggleComp('c4-6')">
+            <div class="comp-icon">⏱️</div>
+            <div>
+              <div class="comp-name">Enriquecimiento de Minutos Jugados</div>
+              <div class="comp-file">Mejora de datos (Celda 11)</div>
+            </div>
+            <div class="comp-toggle">⌄</div>
+          </div>
+          <div class="comp-body">
+            <p class="comp-desc">Pasada final de scraping para completar el dataset maestro con los minutos jugados por cada futbolista, un dato que no llega directamente desde las pestañas de estadísticas y que es necesario como filtro de fiabilidad de muestra (un alto rating con pocos minutos es poco significativo). Se vuelve a recorrer Sofascore con Selenium, normalizando nombres para emparejar contra el CSV maestro existente, y se genera una versión incrementada del dataset (all_leagues_master_v4) que alimenta directamente la herramienta web.</p>
+            <div class="fn-list">
+              <div class="fn-item"><span class="fn-name">normalize_name() / fix_mojibake_text()</span><span class="fn-desc">Mismas funciones de limpieza de texto reutilizadas en los pasos anteriores, para garantizar consistencia en el emparejamiento</span></div>
+              <div class="fn-item"><span class="fn-name">minutes_temp/*.csv</span><span class="fn-desc">CSVs intermedios por liga con los minutos extraídos, combinados después con el dataset maestro</span></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- FASE 5 -->
+    <div class="phase-content" id="phase-5">
+      <div class="phase-header">
+        <div class="phase-badge">Fase 5</div>
+        <div>
+          <h2>Herramienta Web de Scouting</h2>
+          <p>Aplicación Streamlit con 5 pestañas funcionales que convierte todo el pipeline analítico en una interfaz accionable para la dirección deportiva del Rayo Vallecano.</p>
+          <div class="sources">
+            <span class="chip red">Streamlit</span>
+            <span class="chip">Python · Plotly</span>
+            <span class="chip">scikit-learn</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="overview-card">
+        <strong>¿Por qué esta fase?</strong> Esta fase recoge el “motor” real de la herramienta: la aplicación principal, las pestañas que la componen y los módulos que las alimentan. No es solo una interfaz; es la capa de orquestación que une el CSV maestro, los perfiles tácticos, la lógica de similitud y los informes ejecutivos en una experiencia usable para scouts y directores deportivos.
+      </div>
+
+      <div class="section-title">Arquitectura de la aplicación</div>
+      <div class="tab-grid">
+        <div class="tab-card" onclick="selectSubComp(5, 'app')"><div class="tab-card-name">Entrada principal</div><div class="tab-card-desc">streamlit_app.py orquesta la web completa</div></div>
+        <div class="tab-card" onclick="selectSubComp(5, 'tabs')"><div class="tab-card-name">Pestañas de negocio</div><div class="tab-card-desc">Cada tab encapsula un caso de uso distinto</div></div>
+        <div class="tab-card" onclick="selectSubComp(5, 'loader')"><div class="tab-card-name">Carga y limpieza</div><div class="tab-card-desc">data_loader prepara el dataset base</div></div>
+        <div class="tab-card" onclick="selectSubComp(5, 'features')"><div class="tab-card-name">Feature engineering</div><div class="tab-card-desc">Construye los vectores comparables por posición</div></div>
+        <div class="tab-card" onclick="selectSubComp(5, 'clustering')"><div class="tab-card-name">Clustering y similitud</div><div class="tab-card-desc">Segmenta perfiles tácticos y encuentra parecidos</div></div>
+      </div>
+
+      <div class="section-title" style="margin-top: 32px;">Módulos de código y flujo de datos</div>
+      <div class="components">
+
+        <div class="comp-card" id="c5-app">
+          <div class="comp-header" onclick="toggleComp('c5-app')">
+            <div class="comp-icon">🌐</div>
+            <div>
+              <div class="comp-name">Aplicación principal</div>
+              <div class="comp-file">src/rayo_scouting/app/streamlit_app.py</div>
+            </div>
+            <div class="comp-toggle">⌄</div>
+          </div>
+          <div class="comp-body">
+            <p class="comp-desc">Este archivo es la puerta de entrada de la web. Define la configuración de la página, carga el dataset, importa los distintos tabs y conecta la interfaz con los módulos de features y scouting. Es el punto que unifica todo el sistema en una sola aplicación Streamlit.</p>
+            <div class="fn-list">
+              <div class="fn-item"><span class="fn-name">st.set_page_config()</span><span class="fn-desc">Configura el layout, el icono y el estado inicial de la barra lateral.</span></div>
+              <div class="fn-item"><span class="fn-name">render_*_tab()</span><span class="fn-desc">Invoca cada pestaña del dashboard: resumen, buscador, comparador, plantilla e IA.</span></div>
+              <div class="fn-item"><span class="fn-name">load_data()</span><span class="fn-desc">Carga el CSV maestro y lo deja disponible para toda la app.</span></div>
+              <div class="fn-item"><span class="fn-name">warmup_all_clusters()</span><span class="fn-desc">Precalcula clusters y perfiles para que las pestañas no tengan que construirlos en cada interacción.</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="comp-card" id="c5-tabs">
+          <div class="comp-header" onclick="toggleComp('c5-tabs')">
+            <div class="comp-icon">🧩</div>
+            <div>
+              <div class="comp-name">Pestañas de la interfaz</div>
+              <div class="comp-file">src/rayo_scouting/app/tabs/</div>
+            </div>
+            <div class="comp-toggle">⌄</div>
+          </div>
+          <div class="comp-body">
+            <p class="comp-desc">Cada pestaña es un componente de negocio independiente, pero todas dependen de la misma infraestructura. Son las capas de presentación que traducen los datos y los modelos en decisiones accionables para scouting y dirección deportiva.</p>
+            <div class="fn-list">
+              <div class="fn-item"><span class="fn-name">tab_resumen_general.py</span><span class="fn-desc">Vista ejecutiva con KPIs, cartera de candidatos y estado general de la plantilla.</span></div>
+              <div class="fn-item"><span class="fn-name">tab_buscador_perfil.py</span><span class="fn-desc">Explorador multicriterio de mercado con filtros por rol, contrato, valor y perfil táctico.</span></div>
+              <div class="fn-item"><span class="fn-name">tab_comparador_perfiles.py</span><span class="fn-desc">Comparador entre dos jugadores con radares y métricas paralelas.</span></div>
+              <div class="fn-item"><span class="fn-name">tab_analisis_plantilla.py</span><span class="fn-desc">Análisis salarial, contractuales y de necesidades de la plantilla actual.</span></div>
+              <div class="fn-item"><span class="fn-name">tab_scout_ia.py</span><span class="fn-desc">Asistente conversacional que transforma lenguaje natural en búsquedas de perfiles y recomendaciones.</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="comp-card" id="c5-loader">
+          <div class="comp-header" onclick="toggleComp('c5-loader')">
+            <div class="comp-icon">📥</div>
+            <div>
+              <div class="comp-name">Carga, validación y limpieza</div>
+              <div class="comp-file">src/rayo_scouting/features/data_loader.py</div>
+            </div>
+            <div class="comp-toggle">⌄</div>
+          </div>
+          <div class="comp-body">
+            <p class="comp-desc">Esta capa es el “suministro” de datos de la arquitectura. Lee el CSV maestro, limpia columnas, corrige encoding, valida estructura y prepara un dataframe consistente que luego será consumido por tabs y modelos.</p>
+            <div class="fn-list">
+              <div class="fn-item"><span class="fn-name">_validate_columns()</span><span class="fn-desc">Comprueba que existan las columnas mínimas para montar la app.</span></div>
+              <div class="fn-item"><span class="fn-name">_fix_mojibake_text()</span><span class="fn-desc">Corrige problemas de codificación clásicos en nombres y texto.</span></div>
+              <div class="fn-item"><span class="fn-name">_compute_p90_metrics()</span><span class="fn-desc">Genera métricas por 90 minutos para que los perfiles sean comparables.</span></div>
+              <div class="fn-item"><span class="fn-name">load_data()</span><span class="fn-desc">Devuelve un dataframe listo para usar en tabs, clustering y reportes.</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="comp-card" id="c5-features">
+          <div class="comp-header" onclick="toggleComp('c5-features')">
+            <div class="comp-icon">📐</div>
+            <div>
+              <div class="comp-name">Feature engineering</div>
+              <div class="comp-file">src/rayo_scouting/features/feature_engineering.py</div>
+            </div>
+            <div class="comp-toggle">⌄</div>
+          </div>
+          <div class="comp-body">
+            <p class="comp-desc">Aquí se convierte el dataframe bruto en un espacio vectorial útil. Cada posición tiene un conjunto de métricas y pesos distintos para que los jugadores puedan compararse de forma justa.</p>
+            <div class="fn-list">
+              <div class="fn-item"><span class="fn-name">validate_position()</span><span class="fn-desc">Normaliza posiciones del CSV y de los tabs para que no haya desajustes.</span></div>
+              <div class="fn-item"><span class="fn-name">FEATURE_VECTORS</span><span class="fn-desc">Define qué variables son relevantes para defensa, centrocampistas, delanteros y porteros.</span></div>
+              <div class="fn-item"><span class="fn-name">build_feature_matrix()</span><span class="fn-desc">Construye la matriz de features con escalado, imputación y pesos por posición.</span></div>
+              <div class="fn-item"><span class="fn-name">get_player_vector()</span><span class="fn-desc">Permite transformar un jugador concreto en un vector compatible con la similitud.</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="comp-card" id="c5-clustering">
+          <div class="comp-header" onclick="toggleComp('c5-clustering')">
+            <div class="comp-icon">🧠</div>
+            <div>
+              <div class="comp-name">Clustering y similitud</div>
+              <div class="comp-file">src/rayo_scouting/features/clustering.py</div>
+            </div>
+            <div class="comp-toggle">⌄</div>
+          </div>
+          <div class="comp-body">
+            <p class="comp-desc">Esta es la capa analítica compartida por las pestañas. Usa KMeans para agrupar perfiles tácticos por posición, etiqueta esos grupos con nombres comprensibles y calcula jugadores similares con cosine similarity.</p>
+            <div class="fn-list">
+              <div class="fn-item"><span class="fn-name">get_or_build_clusters()</span><span class="fn-desc">Construye o recupera los clusters por posición y los cachea en session_state.</span></div>
+              <div class="fn-item"><span class="fn-name">enrich_df_with_clusters()</span><span class="fn-desc">Añade la etiqueta de cluster al dataframe general para que las tabs puedan pintarla.</span></div>
+              <div class="fn-item"><span class="fn-name">find_similar_players()</span><span class="fn-desc">Encaja a un jugador contra el resto del universo por proximidad vectorial.</span></div>
+              <div class="fn-item"><span class="fn-name">compute_positional_percentile()</span><span class="fn-desc">Calcula percentiles dentro de la misma posición para los radares de comparación.</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="comp-card" id="c5-adaptation">
+          <div class="comp-header" onclick="toggleComp('c5-adaptation')">
+            <div class="comp-icon">🧭</div>
+            <div>
+              <div class="comp-name">Adaptation Score</div>
+              <div class="comp-file">src/rayo_scouting/features/adaptation_score.py</div>
+            </div>
+            <div class="comp-toggle">⌄</div>
+          </div>
+          <div class="comp-body">
+            <p class="comp-desc">Este módulo añade una capa de contexto futbolístico: no solo mira el rendimiento, también estima qué tan bien encaja un jugador en el modelo de juego y en la cultura del Rayo. Sirve como filtro de adaptación antes de pasar al informe final.</p>
+            <div class="fn-list">
+              <div class="fn-item"><span class="fn-name">detect_player_language()</span><span class="fn-desc">Asocia el origen del jugador con un perfil lingüístico y cultural.</span></div>
+              <div class="fn-item"><span class="fn-name">compute_adaptation_score()</span><span class="fn-desc">Combina idioma, experiencia de liga, compatibilidad de presión y contexto del club.</span></div>
+              <div class="fn-item"><span class="fn-name">add_adaptation_scores()</span><span class="fn-desc">Enriquece el dataframe con columnas de adaptación para mostrar en la interfaz.</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="comp-card" id="c5-dashboard">
+          <div class="comp-header" onclick="toggleComp('c5-dashboard')">
+            <div class="comp-icon">📊</div>
+            <div>
+              <div class="comp-name">Métricas de dashboard</div>
+              <div class="comp-file">src/rayo_scouting/scouting/dashboard_metrics.py</div>
+            </div>
+            <div class="comp-toggle">⌄</div>
+          </div>
+          <div class="comp-body">
+            <p class="comp-desc">Capa de utilidades ejecutivas. Aporta helpers para formatear ligas, filtrar la plantilla del Rayo, construir watchlists y devolver métricas resumen que luego se visualizan en pantalla.</p>
+            <div class="fn-list">
+              <div class="fn-item"><span class="fn-name">fmt_liga()</span><span class="fn-desc">Normaliza los nombres de liga para que la salida sea legible en la UI.</span></div>
+              <div class="fn-item"><span class="fn-name">get_rayo_df()</span><span class="fn-desc">Filtra a los jugadores del Rayo desde el dataframe global.</span></div>
+              <div class="fn-item"><span class="fn-name">get_watchlist_df()</span><span class="fn-desc">Devuelve solo los jugadores marcados en la cartera de seguimiento.</span></div>
+              <div class="fn-item"><span class="fn-name">get_summary_metrics()</span><span class="fn-desc">Entrega KPIs agregados usados por la vista de resumen.</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="comp-card" id="c5-reports">
+          <div class="comp-header" onclick="toggleComp('c5-reports')">
+            <div class="comp-icon">📝</div>
+            <div>
+              <div class="comp-name">Generación de informes y exportación</div>
+              <div class="comp-file">src/rayo_scouting/scouting/report_generation.py</div>
+            </div>
+            <div class="comp-toggle">⌄</div>
+          </div>
+          <div class="comp-body">
+            <p class="comp-desc">Esta capa transforma los resultados del análisis en documentos y resúmenes accionables. Es la frontera entre el modelo y la decisión humana, porque convierte los datos en un informe que puede enviarse o conservarse como memoria de scouting.</p>
+            <div class="fn-list">
+              <div class="fn-item"><span class="fn-name">render_watchlist_reports()</span><span class="fn-desc">Genera una vista ejecutiva para los candidatos de la cartera.</span></div>
+              <div class="fn-item"><span class="fn-name">_percentile_in_df()</span><span class="fn-desc">Calcula la posición relativa del jugador frente a otros de su misma demografía.</span></div>
+              <div class="fn-item"><span class="fn-name">CLUB_TACTICAL_MODEL</span><span class="fn-desc">Guarda el contexto táctico del club para orientar la recomendación final.</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="comp-card" id="c5-ia">
+          <div class="comp-header" onclick="toggleComp('c5-ia')">
+            <div class="comp-icon">🤖</div>
+            <div>
+              <div class="comp-name">Asistente IA y prompts</div>
+              <div class="comp-file">src/rayo_scouting/app/tabs/tab_scout_ia.py + scouting/gemini_ai_prompts.py</div>
+            </div>
+            <div class="comp-toggle">⌄</div>
+          </div>
+          <div class="comp-body">
+            <p class="comp-desc">La capa conversacional cierra el círculo entre el usuario y los datos. El asistente interpreta la consulta del scout, la transforma en un perfil de búsqueda y luego aprovecha el dataset preparado por las capas anteriores para responder con contexto de scouting.</p>
+            <div class="fn-list">
+              <div class="fn-item"><span class="fn-name">prepare_df()</span><span class="fn-desc">Prepara una vista del dataframe optimizada para la IA y los filtros de consulta.</span></div>
+              <div class="fn-item"><span class="fn-name">extract_profile_from_conversation()</span><span class="fn-desc">Convierte la conversación en un objeto de criterios de búsqueda.</span></div>
+              <div class="fn-item"><span class="fn-name">call_gpt()</span><span class="fn-desc">Lanza la llamada a la API de texto para transformar la necesidad del usuario en una respuesta accionable.</span></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const PHASES = {
+  1: {
+    label: 'Datos Opta & Juego',
+    items: [
+      { id: 'c1-1', label: 'Carga inicial de datos' },
+      { id: 'c1-2', label: 'Modelado del partido' },
+      { id: 'c1-3', label: 'Análisis de temporada' },
+    ]
+  },
+  2: {
+    label: 'Masa Salarial',
+    items: [
+      { id: 'c2-1', label: 'Carga de datos salariales' },
+      { id: 'c2-2', label: 'Riesgos e ineficiencias' },
+    ]
+  },
+  3: {
+    label: 'Fichajes Históricos',
+    items: [
+      { id: 'c3-1', label: 'Perfil demográfico y económico' },
+      { id: 'c3-2', label: 'Patrones éxito/fracaso' },
+    ]
+  },
+  4: {
+    label: 'Recopilación Mercado',
+    items: [
+      { id: 'c4-ligas', label: 'Ligas cubiertas' },
+      { id: 'c4-1', label: 'Scraping de rendimiento' },
+      { id: 'c4-2', label: 'Datos económicos' },
+    ]
+  },
+  5: {
+    label: 'Herramienta Web',
+    items: [
+      { id: 'c5-app', label: 'Entrada principal' },
+      { id: 'c5-tabs', label: 'Pestañas de negocio' },
+      { id: 'c5-loader', label: 'Carga y limpieza' },
+      { id: 'c5-features', label: 'Feature engineering' },
+      { id: 'c5-clustering', label: 'Clustering y similitud' },
+      { id: 'c5-adaptation', label: 'Adaptation score' },
+      { id: 'c5-dashboard', label: 'Métricas de dashboard' },
+      { id: 'c5-reports', label: 'Informes y exportación' },
+      { id: 'c5-ia', label: 'Asistente IA y prompts' },
+    ]
+  }
+};
+
+let currentPhase = 1;
+
+function buildSidebar(phase) {
+  const sb = document.getElementById('sidebar');
+  sb.innerHTML = '';
+  for (let p = 1; p <= 5; p++) {
+    const data = PHASES[p];
+    const label = document.createElement('div');
+    label.className = 'sidebar-section-label';
+    label.textContent = `Fase ${p} · ${data.label}`;
+    sb.appendChild(label);
+    data.items.forEach(item => {
+      const el = document.createElement('div');
+      el.className = 'sidebar-item' + (p === phase ? '' : ' muted');
+      el.dataset.target = item.id;
+      el.dataset.phase = p;
+      el.innerHTML = `<div class="sidebar-dot"></div>${item.label}`;
+      el.style.opacity = p === phase ? '1' : '0.45';
+      el.onclick = () => {
+        if (p !== currentPhase) selectPhase(p);
+        setTimeout(() => {
+          const el2 = document.getElementById(item.id);
+          if (el2) { el2.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+        }, 80);
+      };
+      sb.appendChild(el);
+    });
+  }
+}
+
+function selectPhase(phase) {
+  currentPhase = phase;
+  document.querySelectorAll('.pipe-step').forEach(s => s.classList.toggle('active', +s.dataset.phase === phase));
+  document.querySelectorAll('.phase-content').forEach(c => c.classList.toggle('active', c.id === `phase-${phase}`));
+  buildSidebar(phase);
+  document.getElementById('content-area').scrollTop = 0;
+  window.scrollTo({ top: 180, behavior: 'smooth' });
+}
+
+function toggleComp(id) {
+  const card = document.getElementById(id);
+  card.classList.toggle('open');
+}
+
+function selectSubComp(phase, name) {
+  selectPhase(phase);
+  setTimeout(() => {
+    const el = document.getElementById(`c5-${name}`);
+    if (el) {
+      el.classList.add('open');
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, 100);
+}
+
+buildSidebar(1);
+</script>
+</body>
+</html>

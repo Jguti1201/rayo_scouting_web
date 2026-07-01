@@ -49,52 +49,46 @@ El flujo del proyecto está dividido en 4 grandes bloques:
 ## 🗂️ Estructura recomendada del repositorio
 
 ```bash
-rayo-scouting-ia/
-│
-├── app/
-│   ├── gemini_app.py
-│   └── tabs/
-│       ├── gemini_tab_resumen_general.py
-│       ├── gemini_tab_scout_ia.py
-│       ├── gemini_tab_explorador_mercado.py
-│       ├── gemini_tab_comparador_perfiles.py
-│       └── gemini_tab_analisis_plantilla.py
-│
-├── backend/
-│   ├── utils/
-│   │   ├── gemini_data_loader.py
-│   │   ├── gemini_feature_engineering.py
-│   │   ├── gemini_clustering.py
-│   │   ├── gemini_adaptation_score.py
-│   │   ├── gemini_dashboard_metrics.py
-│   │   ├── gemini_report_generation.py
-│   │   └── ...
-│   └── data/
-│       ├── raw/
-│       ├── processed/
-│       └── final/
-│
-├── notebooks/
-│   ├── info_transfermarket.ipynb
-│   ├── info_player_stats_big5_v3.ipynb
-│   ├── rayo_vallecano_10_stats.ipynb
-│   └── ...
-│
-├── scripts/
-│   ├── analisis_fichajes.py
-│   ├── merge_con_transfermarket.py
-│   └── transfermarkt_links_scraper.py
-│
-├── reports/
-│   ├── generated_pdfs/
-│   └── figures/
-│
-├── tests/
-│
-├── .env.example
+Scouting_web_RAYO/
+├── .env
 ├── .gitignore
+├── README.md
 ├── requirements.txt
-└── README.md
+├── data/
+│ └── datasets y CSVs maestros usados por la app
+├── docs/
+├── notebooks/
+│ ├── 01_scraping_transfermarket.ipynb
+│ ├── 02_scraping_sofascore.ipynb
+│ ├── 04_analisis_rayo_salarios.ipynb
+│ ├── 05_analisis_fichajes.py
+│ ├── 06_rayo_analisis_juego_app.py
+│ └── otros notebooks y scripts de análisis
+├── src/
+│ └── rayo_scouting/
+│ ├── app/
+│ │ ├── streamlit_app.py
+│ │ ├── assets/
+│ │ ├── data/
+│ │ └── tabs/
+│ │ ├── tab_resumen_general.py
+│ │ ├── tab_buscador_perfil.py
+│ │ ├── tab_comparador_perfiles.py
+│ │ ├── tab_analisis_plantilla.py
+│ │ ├── tab_scout_ia.py
+│ │ └── watchlist.py
+│ ├── features/
+│ │ ├── data_loader.py
+│ │ ├── feature_engineering.py
+│ │ ├── clustering.py
+│ │ └── adaptation_score.py
+│ └── scouting/
+│ ├── dashboard_metrics.py
+│ ├── gemini_ai_prompts.py
+│ └── report_generation.py
+├── venv/
+
+Nota importante:
 ```
 
 ---

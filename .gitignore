@@ -19,16 +19,7 @@ env/
 .streamlit/secrets.toml
 *.log
 
-# Datos pesados / outputs
-data/
-dataset_final/
-sofascore_data/
-*.csv
-*.xlsx
-*.parquet
-*.feather
-*.pkl
-*.joblib
+
 
 # OS / IDE
 .DS_Store
